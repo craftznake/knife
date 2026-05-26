@@ -115,7 +115,7 @@ impl LoginArgs {
     }
 }
 
-struct SSOProfile {
+pub struct SSOProfile {
     pub name: String,
     pub start_url: String,
     pub account_id: String,
@@ -124,7 +124,7 @@ struct SSOProfile {
 
 /// Get all SSO profiles from ~/.aws/config using INI parser
 /// Returns profiles that have sso_start_url or sso_session configured
-fn get_sso_profiles() -> Result<Vec<SSOProfile>, Box<dyn std::error::Error>> {
+pub fn get_sso_profiles() -> Result<Vec<SSOProfile>, Box<dyn std::error::Error>> {
     // Get home directory and build config path
     let home = match std::env::var("HOME") {
         Ok(h) => h,

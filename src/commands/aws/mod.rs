@@ -4,6 +4,7 @@ pub mod handler;
 pub mod utils;
 
 pub mod asg;
+pub mod console;
 pub mod ec2;
 pub mod elb;
 pub mod route53;

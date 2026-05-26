@@ -44,6 +44,7 @@ impl CommandHandler for AWSHandler {
             AWSSubCommand::EC2(ec2_cmd) => ec2_cmd.execute(opts).await,
             AWSSubCommand::ASG(asg_cmd) => asg_cmd.execute(opts).await,
             AWSSubCommand::SSM(ssm_cmd) => ssm_cmd.execute(opts).await,
+            AWSSubCommand::Console(console_cmd) => console_cmd.execute(opts).await,
             AWSSubCommand::SSO(_) => {
                 unreachable!("SSO command should have been handled earlier")
             }

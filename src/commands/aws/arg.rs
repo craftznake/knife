@@ -2,9 +2,9 @@ use aws_config::SdkConfig;
 use clap::{Args, Subcommand};
 
 use crate::commands::aws::{
-    asg::arg::AWSASGCommand, ec2::arg::AWSEC2Command, elb::arg::AWSElbCommand,
-    route53::arg::AWSRoute53Command, ssm::arg::AWSSSMCommand, sso::arg::AWSSSOCommand,
-    whoami::arg::AWSWhoAmICommand,
+    asg::arg::AWSASGCommand, console::arg::AWSConsoleCommand, ec2::arg::AWSEC2Command,
+    elb::arg::AWSElbCommand, route53::arg::AWSRoute53Command, ssm::arg::AWSSSMCommand,
+    sso::arg::AWSSSOCommand, whoami::arg::AWSWhoAmICommand,
 };
 #[derive(Debug, Args)]
 pub struct AWSCommand {
@@ -41,6 +41,8 @@ pub enum AWSSubCommand {
     SSM(AWSSSMCommand),
     /// Work with sinngle sign on.
     SSO(AWSSSOCommand),
+    /// Work with console related stuffs
+    Console(AWSConsoleCommand),
 }
 
 #[derive(Debug)]
