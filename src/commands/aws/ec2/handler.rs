@@ -344,7 +344,7 @@ impl TerminateArg {
         // Confirmation prompt (unless --yes flag is used)
         if !self.yes {
             let prompt = format!(
-                "\n⚠️  WARNING: You are about to terminate instance {}. This action cannot be undone!\n   Continue?",
+                "\n\tWARNING: You are about to terminate instance {}. This action cannot be undone!\n   Continue?",
                 self.instance_id
             );
             if !Confirm::new()
@@ -417,7 +417,7 @@ impl TerminateArg {
                 .await
             {
                 Ok(_) => {
-                    output.stderr("✓ Instance stopped successfully");
+                    output.stderr(" Instance stopped successfully");
                 }
                 Err(e) => {
                     return Err(format!("Failed to stop instance: {}", e).into());
@@ -488,7 +488,7 @@ impl TerminateArg {
         }
 
         output.stderr(&format!(
-            "\n✅ Instance {} has been successfully terminated.",
+            "\nDONE: Instance {} has been successfully terminated.",
             self.instance_id
         ));
 
