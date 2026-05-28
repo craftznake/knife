@@ -285,7 +285,7 @@ fn clean_last_session() -> Result<(), Box<dyn std::error::Error>> {
             let shell_config = shell_config?;
             let path = shell_config.path();
             if path.is_file() {
-                fs::remove_file(path)?;
+                fs::write(path, "")?;
             };
         }
     };
