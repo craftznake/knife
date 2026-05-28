@@ -1,7 +1,9 @@
 use aws_sdk_ssm::Client;
+use nix::sys::signal::{SigHandler, Signal, kill, signal as nix_signal};
+use nix::unistd::Pid;
 use serde_json::json;
-use std::process::{self, Command, Stdio};
-use tokio::signal;
+use std::process::{Command, Stdio};
+use tokio::signal::unix::{SignalKind, signal as tokio_signal};
 
 use crate::commands::Output;
 use crate::commands::aws::{
@@ -97,49 +99,52 @@ impl StartArg {
                         return Err(format!("Failed to start interactive session: {}", e).into());
                     }
                 };
+                // The child inherits knife's process group, by default, all processes in the same
+                // pg receive the same set of signals delivered from terminal
+                // At this point, we ignore all possible terminate signal so knife is not exited before ssm.
+                let old_int = unsafe { nix_signal(Signal::SIGINT, SigHandler::SigIgn) }?; // ctrl+c
+                let old_quit = unsafe { nix_signal(Signal::SIGQUIT, SigHandler::SigIgn) }?; // ctrl+\
+                let old_tstp = unsafe { nix_signal(Signal::SIGTSTP, SigHandler::SigIgn) }?; // ctrl+z
+                let old_cont = unsafe { nix_signal(Signal::SIGCONT, SigHandler::SigIgn) }?; // fg
 
-                // Set up signal handling to forward signals to the child process
-                // This mimics the behavior of the native AWS CLI
-                let child_id = child.id();
+                let child_pid = Pid::from_raw(child.id() as i32);
 
-                // Create a signal handler that forwards common termination signals
-                tokio::spawn(async move {
-                    // Handle SIGINT (Ctrl+C)
-                    let ctrl_c = signal::ctrl_c();
-                    let mut sigterm = signal::unix::signal(libc::SIGTERM.into()).unwrap();
-                    let mut sighup = signal::unix::signal(libc::SIGHUP.into()).unwrap();
-
+                // SIGTERM/SIGHUP may be sent directly to knife's pid only, not to the
+                // whole pg, so forward them to our child explicitly.
+                let sig_task = tokio::spawn(async move {
+                    let mut sigterm = tokio_signal(SignalKind::terminate()).unwrap();
+                    let mut sighup = tokio_signal(SignalKind::hangup()).unwrap();
                     tokio::select! {
-                        _ = ctrl_c => {
-                            // Forward SIGINT to child process
-                            unsafe { libc::kill(child_id as i32, libc::SIGINT); }
-                        }
                         _ = sigterm.recv() => {
-                            // Forward SIGTERM to child process
-                            unsafe { libc::kill(child_id as i32, libc::SIGTERM); }
+                            let _ = kill(child_pid, Signal::SIGTERM);
                         }
                         _ = sighup.recv() => {
-                            // Forward SIGHUP to child process
-                            unsafe { libc::kill(child_id as i32, libc::SIGHUP); }
+                            let _ = kill(child_pid, Signal::SIGHUP);
                         }
                     }
                 });
 
-                // Wait for the child process to complete
-                match child.wait() {
-                    Ok(exit_status) => {
-                        if !exit_status.success() {
-                            return Err(format!("Session ended with code: {}", exit_status).into());
-                        }
-                        let output = Output::new(opts.verbose);
-                        output.stderr("Session ended");
-                        return Ok(output);
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to wait for session process: {}", e);
-                        process::exit(1);
-                    }
+                let result = child.wait();
+
+                // clean our background sig task
+                sig_task.abort();
+
+                // recover the signal handling of knife
+                unsafe {
+                    let _ = nix_signal(Signal::SIGINT, old_int);
+                    let _ = nix_signal(Signal::SIGQUIT, old_quit);
+                    let _ = nix_signal(Signal::SIGTSTP, old_tstp);
+                    let _ = nix_signal(Signal::SIGCONT, old_cont);
                 }
+
+                // Wait for the child process to complete
+                let exit_status = result?;
+                if !exit_status.success() {
+                    return Err(format!("Session ended with code: {}", exit_status).into());
+                }
+                let output = Output::new(opts.verbose);
+                output.stderr("Session ended");
+                Ok(output)
             }
             Err(err) => {
                 use aws_sdk_ssm::error::SdkError;
