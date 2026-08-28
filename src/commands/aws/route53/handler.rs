@@ -18,157 +18,154 @@ impl AWSRoute53Command {
     pub async fn execute(self, opts: GlobalOptions) -> Result<Output, Box<dyn std::error::Error>> {
         let client = Client::new(&opts.sdk_config);
         match self.command {
-            Route53SubCommand::Get(args) => args.execute(&client, opts).await,
+            Route53SubCommand::Get(domain_name) => execute(domain_name, &client, opts).await,
         }
     }
 }
 
-impl GetArg {
-    async fn execute(
-        self,
-        client: &Client,
-        opts: GlobalOptions,
-    ) -> Result<Output, Box<dyn std::error::Error>> {
-        // Basic domain validation
-        if self.dns_name.is_empty() || !self.dns_name.contains('.') {
-            return Err(format!(
-                "Error: Invalid domain format. Please provide a valid domain name."
-            )
-            .into());
+async fn execute(
+    dns_name: String,
+    client: &Client,
+    opts: GlobalOptions,
+) -> Result<Output, Box<dyn std::error::Error>> {
+    // Basic domain validation
+    if dns_name.is_empty() || !dns_name.contains('.') {
+        return Err(
+            format!("Error: Invalid domain format. Please provide a valid domain name.").into(),
+        );
+    }
+
+    // Find the appropriate hosted zone by trying different domain levels
+    let mut output = Output::new(opts.verbose);
+    let hosted_zone =
+        Self::find_hosted_zone_for_domain(client, &dns_name, &opts, &mut output).await?;
+
+    // Get resource records for the domain
+    match client
+        .list_resource_record_sets()
+        .set_hosted_zone_id(Some(hosted_zone.id().to_string()))
+        .set_start_record_name(Some(dns_name.clone()))
+        .send()
+        .await
+    {
+        Ok(response) => {
+            let records: Vec<&ResourceRecordSet> = response
+                .resource_record_sets()
+                .iter()
+                .filter(|record| {
+                    let name = record.name();
+                    name == &dns_name || name == &format!("{}.", dns_name)
+                })
+                .collect();
+
+            let record_values: Vec<Value> = records
+                .iter()
+                .map(|r| if opts.verbose { r.long() } else { r.short() })
+                .collect();
+
+            let result = json!({
+                "hosted_zone": if opts.verbose {hosted_zone.long()}else{hosted_zone.short()},
+                "records": record_values,
+            });
+
+            output.stdout(&serde_json::to_string_pretty(&result).unwrap());
+            Ok(output)
+        }
+        Err(err) => {
+            use aws_sdk_route53::error::SdkError;
+            let is_not_found =
+                matches!(&err, SdkError::ServiceError(se) if se.err().is_no_such_hosted_zone());
+            if is_not_found {
+                output.stderr(&format!("Route53: {} not found", dns_name));
+            }
+            match err {
+                SdkError::ServiceError(ref service_err) => {
+                    handle_service_error(service_err.err(), "get route53 record");
+                }
+                SdkError::DispatchFailure(ref dispatch_err) => {
+                    handle_dispatch_failure(dispatch_err, "get route53 record");
+                }
+                SdkError::ConstructionFailure(ref err) => {
+                    handle_construction_failure(err, "get route53 record", false);
+                }
+                SdkError::TimeoutError(ref err) => {
+                    handle_timeout_error(err, "get route53 record", false);
+                }
+                SdkError::ResponseError(ref err) => {
+                    handle_response_error(err, "get route53 record", false);
+                }
+                _ => {
+                    handle_unknown_error(&err, "get route53 record", false);
+                }
+            }
+            Err(format!("Error: Failed to get route53 record: {}", err).into())
+        }
+    }
+}
+
+async fn find_hosted_zone_for_domain(
+    client: &Client,
+    domain: &str,
+    opts: &GlobalOptions,
+    output: &mut Output,
+) -> Result<HostedZone, Box<dyn std::error::Error>> {
+    // Try to find hosted zone by checking domain and its parent domains
+    let domain_parts: Vec<&str> = domain.split('.').collect();
+
+    for i in (0..domain_parts.len() - 1).rev() {
+        let candidate_domain = domain_parts[i..].join(".");
+        let candidate_domain_with_dot = format!("{}.", candidate_domain);
+
+        if opts.verbose {
+            output.stderr(&format!(
+                "Trying to find hosted zone for: {}",
+                candidate_domain
+            ));
         }
 
-        // Find the appropriate hosted zone by trying different domain levels
-        let mut output = Output::new(opts.verbose);
-        let hosted_zone =
-            Self::find_hosted_zone_for_domain(client, &self.dns_name, &opts, &mut output).await?;
-
-        // Get resource records for the domain
         match client
-            .list_resource_record_sets()
-            .set_hosted_zone_id(Some(hosted_zone.id().to_string()))
-            .set_start_record_name(Some(self.dns_name.clone()))
+            .list_hosted_zones_by_name()
+            .set_dns_name(Some(candidate_domain_with_dot.clone()))
+            .set_max_items(Some(1))
             .send()
             .await
         {
             Ok(response) => {
-                let records: Vec<&ResourceRecordSet> = response
-                    .resource_record_sets()
-                    .iter()
-                    .filter(|record| {
-                        let name = record.name();
-                        name == &self.dns_name || name == &format!("{}.", self.dns_name)
-                    })
-                    .collect();
-
-                let record_values: Vec<Value> = records
-                    .iter()
-                    .map(|r| if opts.verbose { r.long() } else { r.short() })
-                    .collect();
-
-                let result = json!({
-                    "hosted_zone": if opts.verbose {hosted_zone.long()}else{hosted_zone.short()},
-                    "records": record_values,
-                });
-
-                output.stdout(&serde_json::to_string_pretty(&result).unwrap());
-                Ok(output)
+                let zones = response.hosted_zones();
+                for zone in zones {
+                    if zone.name() == &candidate_domain_with_dot {
+                        if opts.verbose {
+                            output.stderr(&format!(
+                                "Found hosted zone: {} ({})",
+                                zone.name(),
+                                zone.id()
+                            ));
+                        }
+                        return Ok(zone.clone());
+                    }
+                }
             }
             Err(err) => {
-                use aws_sdk_route53::error::SdkError;
-                let is_not_found =
-                    matches!(&err, SdkError::ServiceError(se) if se.err().is_no_such_hosted_zone());
-                if is_not_found {
-                    output.stderr(&format!("Route53: {} not found", self.dns_name));
+                if opts.verbose {
+                    output.stderr(&format!(
+                        "Failed to check domain '{}': {}",
+                        candidate_domain, err
+                    ));
                 }
-                match err {
-                    SdkError::ServiceError(ref service_err) => {
-                        handle_service_error(service_err.err(), "get route53 record");
-                    }
-                    SdkError::DispatchFailure(ref dispatch_err) => {
-                        handle_dispatch_failure(dispatch_err, "get route53 record");
-                    }
-                    SdkError::ConstructionFailure(ref err) => {
-                        handle_construction_failure(err, "get route53 record", false);
-                    }
-                    SdkError::TimeoutError(ref err) => {
-                        handle_timeout_error(err, "get route53 record", false);
-                    }
-                    SdkError::ResponseError(ref err) => {
-                        handle_response_error(err, "get route53 record", false);
-                    }
-                    _ => {
-                        handle_unknown_error(&err, "get route53 record", false);
-                    }
-                }
-                Err(format!("Error: Failed to get route53 record: {}", err).into())
             }
         }
     }
 
-    async fn find_hosted_zone_for_domain(
-        client: &Client,
-        domain: &str,
-        opts: &GlobalOptions,
-        output: &mut Output,
-    ) -> Result<HostedZone, Box<dyn std::error::Error>> {
-        // Try to find hosted zone by checking domain and its parent domains
-        let domain_parts: Vec<&str> = domain.split('.').collect();
-
-        for i in (0..domain_parts.len() - 1).rev() {
-            let candidate_domain = domain_parts[i..].join(".");
-            let candidate_domain_with_dot = format!("{}.", candidate_domain);
-
-            if opts.verbose {
-                output.stderr(&format!(
-                    "Trying to find hosted zone for: {}",
-                    candidate_domain
-                ));
-            }
-
-            match client
-                .list_hosted_zones_by_name()
-                .set_dns_name(Some(candidate_domain_with_dot.clone()))
-                .set_max_items(Some(1))
-                .send()
-                .await
-            {
-                Ok(response) => {
-                    let zones = response.hosted_zones();
-                    for zone in zones {
-                        if zone.name() == &candidate_domain_with_dot {
-                            if opts.verbose {
-                                output.stderr(&format!(
-                                    "Found hosted zone: {} ({})",
-                                    zone.name(),
-                                    zone.id()
-                                ));
-                            }
-                            return Ok(zone.clone());
-                        }
-                    }
-                }
-                Err(err) => {
-                    if opts.verbose {
-                        output.stderr(&format!(
-                            "Failed to check domain '{}': {}",
-                            candidate_domain, err
-                        ));
-                    }
-                }
-            }
-        }
-
-        output.stderr(&format!(
-            "Error: No hosted zone found for domain '{}' or any of its parent domains",
-            domain
-        ));
-        output.stderr("Make sure the domain is managed by Route53 in your AWS account.");
-        Err(format!(
-            "Error: No hosted zone found for domain '{}' or any of its parent domains",
-            domain
-        )
-        .into())
-    }
+    output.stderr(&format!(
+        "Error: No hosted zone found for domain '{}' or any of its parent domains",
+        domain
+    ));
+    output.stderr("Make sure the domain is managed by Route53 in your AWS account.");
+    Err(format!(
+        "Error: No hosted zone found for domain '{}' or any of its parent domains",
+        domain
+    )
+    .into())
 }
 
 trait HostedZoneExt {

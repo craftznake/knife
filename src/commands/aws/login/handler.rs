@@ -1,42 +1,18 @@
 use dialoguer::FuzzySelect;
 use ini::ini;
-use std::fs;
-use std::path::PathBuf;
-use std::process::{self, Command};
+
+use std::{
+    fs,
+    path::PathBuf,
+    process::{self, Command},
+};
 
 use crate::commands::Output;
-use crate::commands::aws::sso::arg::{AWSSSOCommand, LoginArgs, LogoutArgs, SSOSubCommand};
+use crate::commands::aws::login::arg::AWSLoginCommand;
 use crate::shells;
 
-impl AWSSSOCommand {
+impl AWSLoginCommand {
     pub async fn execute(self, verbose: bool) -> Result<Output, Box<dyn std::error::Error>> {
-        match self.command {
-            SSOSubCommand::Login(args) => args.execute(verbose).await,
-            SSOSubCommand::Logout(args) => args.execute(verbose).await,
-        }
-    }
-}
-
-impl LogoutArgs {
-    async fn execute(self, verbose: bool) -> Result<Output, Box<dyn std::error::Error>> {
-        let output = Output::new(verbose);
-
-        // Perform SSO logout
-        match sso_logout(self.profile.as_deref()).await {
-            Ok(_) => {
-                output.stderr("SSO logout completed successfully");
-                Ok(output)
-            }
-            Err(e) => {
-                output.stderr(&format!("SSO logout failed: {}", e));
-                Err(e)
-            }
-        }
-    }
-}
-
-impl LoginArgs {
-    async fn execute(self, verbose: bool) -> Result<Output, Box<dyn std::error::Error>> {
         let output = Output::new(verbose);
         let mut login_url: Option<String> = None;
 
@@ -205,30 +181,6 @@ pub fn get_sso_profiles() -> Result<Vec<SSOProfile>, Box<dyn std::error::Error>>
     Ok(sso_profiles)
 }
 
-async fn sso_logout(profile: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
-    // Execute aws sso login command
-    let mut cmd = Command::new("aws");
-    cmd.arg("sso").arg("logout");
-    if let Some(p) = profile {
-        cmd.arg("--profile").arg(p);
-    };
-    match cmd.status() {
-        Ok(exit_status) => {
-            if !exit_status.success() {
-                return Err(format!("SSO logout failed with code: {}", exit_status).into());
-            }
-
-            // Save the profile and region for future knife commands
-            if let Err(e) = clean_last_session() {
-                return Err(format!("Warning: Failed to save session preferences: {}", e).into());
-            }
-
-            Ok(())
-        }
-        Err(e) => Err(format!("Failed to login SSO: {}", e).into()),
-    }
-}
-
 async fn sso_login(profile: &str, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     // Execute aws sso login command
     match Command::new("aws")
@@ -273,23 +225,6 @@ fn get_config_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
     }
 
     Ok(config_dir)
-}
-
-fn clean_last_session() -> Result<(), Box<dyn std::error::Error>> {
-    let config_dir = get_config_dir().map_err(|e| -> Box<dyn std::error::Error> {
-        format!("failed to get config directory: {}", e).into()
-    })?;
-    let shell_config_dir = config_dir.join("shell");
-    if shell_config_dir.is_dir() {
-        for shell_config in fs::read_dir(shell_config_dir)? {
-            let shell_config = shell_config?;
-            let path = shell_config.path();
-            if path.is_file() {
-                fs::write(path, "")?;
-            };
-        }
-    };
-    Ok(())
 }
 
 /// Save the last used AWS profile and region to knife config
