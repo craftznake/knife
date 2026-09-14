@@ -9,5 +9,8 @@ pub struct AWSRoute53Command {
 #[derive(Debug, Subcommand)]
 pub enum Route53SubCommand {
     /// Get domain record configuration
-    Get(String),
+    Get {
+        #[arg(value_name = "DOMAIN")]
+        domain: String,
+    },
 }

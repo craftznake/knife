@@ -4,7 +4,7 @@ use crate::commands::{
     AWSCommand, CommandHandler, Output,
     aws::{
         arg::{AWSSubCommand, GlobalOptions},
-        sso::handler::{load_last_profile, load_last_region},
+        login::handler::{load_last_profile, load_last_region},
     },
 };
 
@@ -22,7 +22,7 @@ impl CommandHandler for AWSHandler {
         } = self.cmd;
 
         // Some commands don't need to load AWS config, just execute them directly
-        if let AWSSubCommand::SSO(sso_cmd) = command {
+        if let AWSSubCommand::Login(sso_cmd) = command {
             // SSO login doesn't require credentials
             let _ = sso_cmd.execute(verbose).await;
             let output = Output::new(verbose);
@@ -45,7 +45,8 @@ impl CommandHandler for AWSHandler {
             AWSSubCommand::ASG(asg_cmd) => asg_cmd.execute(opts).await,
             AWSSubCommand::SSM(ssm_cmd) => ssm_cmd.execute(opts).await,
             AWSSubCommand::Console(console_cmd) => console_cmd.execute(opts).await,
-            AWSSubCommand::SSO(_) => {
+            AWSSubCommand::Logout(logout_cmd) => logout_cmd.execute(opts).await,
+            AWSSubCommand::Login(_) => {
                 unreachable!("SSO command should have been handled earlier")
             }
         }

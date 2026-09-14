@@ -5,7 +5,7 @@ use dialoguer::FuzzySelect;
 use crate::commands::Output;
 use crate::commands::aws::arg::GlobalOptions;
 use crate::commands::aws::console::arg::{AWSConsoleCommand, ConsoleSubCommand, Login};
-use crate::commands::aws::sso::handler::{get_sso_profiles, load_last_profile};
+use crate::commands::aws::login::handler::{get_sso_profiles, load_last_profile};
 
 impl AWSConsoleCommand {
     pub async fn execute(self, opts: GlobalOptions) -> Result<Output, Box<dyn std::error::Error>> {

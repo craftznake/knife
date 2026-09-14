@@ -1,4 +1,4 @@
-use clap::{Args, Subcommand};
+use clap::Args;
 
 #[derive(Debug, Args)]
 pub struct AWSLogoutCommand {

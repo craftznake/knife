@@ -3,8 +3,8 @@ use clap::{Args, Subcommand};
 
 use crate::commands::aws::{
     asg::arg::AWSASGCommand, console::arg::AWSConsoleCommand, ec2::arg::AWSEC2Command,
-    elb::arg::AWSElbCommand, route53::arg::AWSRoute53Command, ssm::arg::AWSSSMCommand,
-    sso::arg::AWSSSOCommand, whoami::arg::AWSWhoAmICommand,
+    elb::arg::AWSElbCommand, login::arg::AWSLoginCommand, logout::arg::AWSLogoutCommand,
+    route53::arg::AWSRoute53Command, ssm::arg::AWSSSMCommand, whoami::arg::AWSWhoAmICommand,
 };
 #[derive(Debug, Args)]
 pub struct AWSCommand {
@@ -39,8 +39,10 @@ pub enum AWSSubCommand {
     ASG(AWSASGCommand),
     /// Work with service system manager.
     SSM(AWSSSMCommand),
-    /// Work with sinngle sign on.
-    SSO(AWSSSOCommand),
+    /// Login aws
+    Login(AWSLoginCommand),
+    /// Logout aws
+    Logout(AWSLogoutCommand),
     /// Work with console related stuffs
     Console(AWSConsoleCommand),
 }

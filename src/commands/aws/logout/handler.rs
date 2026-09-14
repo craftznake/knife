@@ -1,11 +1,13 @@
-use std::{fs, path::PathBuf, process::Command};
+use std::{fs, process::Command};
 
 use crate::commands::Output;
+use crate::commands::aws::arg::GlobalOptions;
 use crate::commands::aws::logout::arg::AWSLogoutCommand;
+use crate::commands::aws::utils::get_config_dir;
 
 impl AWSLogoutCommand {
-    pub async fn execute(self, verbose: bool) -> Result<Output, Box<dyn std::error::Error>> {
-        let output = Output::new(verbose);
+    pub async fn execute(self, opts: GlobalOptions) -> Result<Output, Box<dyn std::error::Error>> {
+        let output = Output::new(opts.verbose);
 
         // Perform SSO logout
         match sso_logout(self.profile.as_deref()).await {
@@ -60,22 +62,4 @@ fn clean_last_session() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
     Ok(())
-}
-
-/// Get the knife config directory path (~/.knife)
-fn get_config_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let home = std::env::var("HOME").map_err(|_| -> Box<dyn std::error::Error> {
-        format!("HOME environment variable not set").into()
-    })?;
-
-    let config_dir = PathBuf::from(home).join(".knife");
-
-    // Create directory if it doesn't exist
-    if !config_dir.exists() {
-        fs::create_dir_all(&config_dir).map_err(|e| -> Box<dyn std::error::Error> {
-            format!("Failed to create config directory: {}", e).into()
-        })?;
-    }
-
-    Ok(config_dir)
 }

@@ -11,14 +11,14 @@ use crate::commands::aws::{
         handle_construction_failure, handle_dispatch_failure, handle_response_error,
         handle_service_error, handle_timeout_error, handle_unknown_error,
     },
-    route53::arg::{AWSRoute53Command, GetArg, Route53SubCommand},
+    route53::arg::{AWSRoute53Command, Route53SubCommand},
 };
 
 impl AWSRoute53Command {
     pub async fn execute(self, opts: GlobalOptions) -> Result<Output, Box<dyn std::error::Error>> {
         let client = Client::new(&opts.sdk_config);
         match self.command {
-            Route53SubCommand::Get(domain_name) => execute(domain_name, &client, opts).await,
+            Route53SubCommand::Get { domain } => execute(domain, &client, opts).await,
         }
     }
 }
@@ -37,8 +37,7 @@ async fn execute(
 
     // Find the appropriate hosted zone by trying different domain levels
     let mut output = Output::new(opts.verbose);
-    let hosted_zone =
-        Self::find_hosted_zone_for_domain(client, &dns_name, &opts, &mut output).await?;
+    let hosted_zone = find_hosted_zone_for_domain(client, &dns_name, &opts, &mut output).await?;
 
     // Get resource records for the domain
     match client
