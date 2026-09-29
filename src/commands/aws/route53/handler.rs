@@ -67,7 +67,10 @@ async fn execute(
                 "records": record_values,
             });
 
-            output.stdout(&serde_json::to_string_pretty(&result).unwrap());
+            output.stdout(&crate::commands::aws::resource::output::render(
+                &result,
+                opts.output_format,
+            )?);
             Ok(output)
         }
         Err(err) => {

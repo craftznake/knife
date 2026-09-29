@@ -1,5 +1,5 @@
-/// Simple, expandable output system
-/// Separates stderr (debug) and stdout (data) cleanly
+//! Simple, expandable output system.
+//! Separates stderr (debug) and stdout (data) cleanly.
 
 pub struct Output {
     _verbose: bool,

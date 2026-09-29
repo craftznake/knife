@@ -17,6 +17,8 @@ async fn main() {
     }
 
     let args = KnifeArgs::parse();
+    let root_region = args.region.clone();
+    let root_profile = args.profile.clone();
 
     match args.command {
         Command::Completion(completion_cmd) => {
@@ -50,7 +52,9 @@ async fn main() {
                 }
             }
         }
-        Command::Aws(aws_cmd) => {
+        Command::Aws(mut aws_cmd) => {
+            aws_cmd.root_region = root_region;
+            aws_cmd.root_profile = root_profile;
             let aws_handler = AWSHandler::new(aws_cmd);
             match aws_handler.execute().await {
                 Ok(_output) => {

@@ -17,11 +17,12 @@ use aws_sdk_autoscaling::{Client, types::AutoScalingGroup};
 impl AWSASGCommand {
     pub async fn execute(self, opts: GlobalOptions) -> Result<Output, Box<dyn std::error::Error>> {
         let client = Client::new(&opts.sdk_config);
+        let name = self.name.clone();
         match self.command {
-            ASGSubCommand::Get => self.get_asg(&client, &opts).await,
-            ASGSubCommand::Scale(args) => args.execute(self.name, &client, &opts).await,
-            ASGSubCommand::DetachInstances(args) => args.execute(self.name, &client, &opts).await,
-            ASGSubCommand::AttachInstances(args) => args.execute(self.name, &client, &opts).await,
+            ASGSubCommand::Get => self.get_asg(&client, &opts, &name).await,
+            ASGSubCommand::Scale(args) => args.execute(name, &client, &opts).await,
+            ASGSubCommand::DetachInstances(args) => args.execute(name, &client, &opts).await,
+            ASGSubCommand::AttachInstances(args) => args.execute(name, &client, &opts).await,
         }
     }
 
@@ -29,15 +30,38 @@ impl AWSASGCommand {
         self,
         client: &Client,
         opts: &GlobalOptions,
+        name: &str,
     ) -> Result<Output, Box<dyn std::error::Error>> {
-        match get_asg_details(client, &self.name, opts.verbose).await {
+        match get_asg_details(client, name, opts.verbose).await {
             Ok(asg) => {
                 let output = Output::new(opts.verbose);
-                output.stdout(&serde_json::to_string_pretty(&asg).unwrap());
+                output.stdout(&crate::commands::aws::resource::output::render(
+                    &asg,
+                    opts.output_format,
+                )?);
                 Ok(output)
             }
             Err(error_msg) => Err(format!("Error getting ASG: {}", error_msg).into()),
         }
+    }
+}
+
+#[allow(dead_code)]
+pub async fn get_asg(
+    name: String,
+    opts: GlobalOptions,
+) -> Result<Output, Box<dyn std::error::Error>> {
+    let client = Client::new(&opts.sdk_config);
+    match get_asg_details(&client, &name, opts.verbose).await {
+        Ok(asg) => {
+            let output = Output::new(opts.verbose);
+            output.stdout(&crate::commands::aws::resource::output::render(
+                &asg,
+                opts.output_format,
+            )?);
+            Ok(output)
+        }
+        Err(error_msg) => Err(format!("Error getting ASG: {}", error_msg).into()),
     }
 }
 

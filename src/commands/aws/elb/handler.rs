@@ -58,7 +58,10 @@ impl GetArg {
             .map(|lb| if opts.verbose { lb.long() } else { lb.short() })
             .collect();
 
-        output.stdout(&serde_json::to_string_pretty(&lb_data).unwrap());
+        output.stdout(&crate::commands::aws::resource::output::render(
+            &serde_json::to_value(&lb_data)?,
+            opts.output_format,
+        )?);
         Ok(output)
     }
 }
@@ -403,7 +406,10 @@ impl GetRulesArg {
             final_rules.iter().map(|rule| rule.short()).collect()
         };
 
-        output.stdout(&serde_json::to_string_pretty(&rule_data).unwrap());
+        output.stdout(&crate::commands::aws::resource::output::render(
+            &serde_json::to_value(&rule_data)?,
+            opts.output_format,
+        )?);
         Ok(output)
     }
 }
@@ -638,7 +644,10 @@ impl GetListenersArg {
                         .map(|l| if opts.verbose { l.long() } else { l.short() })
                         .collect();
 
-                    output.stdout(&serde_json::to_string_pretty(&listener_data).unwrap());
+                    output.stdout(&crate::commands::aws::resource::output::render(
+                        &serde_json::to_value(&listener_data)?,
+                        opts.output_format,
+                    )?);
                     return Ok(output);
                 }
                 None => {

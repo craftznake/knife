@@ -9,6 +9,14 @@ use std::process;
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
 pub struct KnifeArgs {
+    /// AWS region context for AWS service operations.
+    #[arg(long, short = 'r')]
+    pub region: Option<String>,
+
+    /// AWS profile context for AWS service operations.
+    #[arg(long, short = 'p')]
+    pub profile: Option<String>,
+
     #[command(subcommand)]
     pub command: Command,
 }
@@ -89,7 +97,21 @@ impl CompletionCommand {
 #[cfg(test)]
 mod tests {
     use super::KnifeArgs;
-    use clap::CommandFactory;
+    use clap::{CommandFactory, Parser};
+
+    #[test]
+    fn root_and_aws_context_flags_parse_in_both_orders() {
+        for argv in [
+            vec!["knife", "--profile", "p", "--region", "r", "aws", "whoami"],
+            vec!["knife", "-p", "p", "-r", "r", "aws", "whoami"],
+            vec!["knife", "--profile", "p", "aws", "whoami"],
+            vec!["knife", "-p", "p", "aws", "whoami"],
+            vec!["knife", "--region", "r", "aws", "whoami"],
+            vec!["knife", "-r", "r", "aws", "whoami"],
+        ] {
+            KnifeArgs::try_parse_from(argv).expect("context placement should parse");
+        }
+    }
 
     #[test]
     fn completion_help_has_current_syntax_without_stale_terms() {

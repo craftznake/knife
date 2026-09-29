@@ -10,10 +10,13 @@ pub struct AWSElbCommand {
 #[derive(Debug, Subcommand)]
 pub enum ElbSubCommand {
     /// Get command - Get load balancer using name
+    #[command(name = "get", hide = true)]
     Get(GetArg),
     /// get-listener - Get load balancer's listener using lb arn
+    #[command(name = "get-listeners", hide = true)]
     GetListeners(GetListenersArg),
     /// get-rules - Get listener's rules using listener_arn
+    #[command(name = "get-rules", hide = true)]
     GetRules(GetRulesArg),
 }
 
@@ -26,15 +29,15 @@ pub struct GetArg {
     #[arg(long)]
     pub num: Option<i8>,
     /// perform fuzzy search using the full name
-    #[arg(long, default_value_t = true)]
+    #[arg(long = "fuzzy", default_value_t = true)]
     pub fuzzy: bool,
 }
 
 #[derive(Debug, Args)]
 pub struct GetRulesArg {
     /// ARN of Listener which contains the rules
-    #[arg(long = "arn")]
-    #[clap(value_parser = utils::token_or_stdin_parser, default_value = "-")]
+    #[arg(long = "arn", required = true)]
+    #[clap(value_parser = utils::token_or_stdin_parser)]
     pub listener_arn: String,
 
     /// Number of records should be returned.
@@ -49,7 +52,7 @@ pub struct GetRulesArg {
 #[derive(Debug, Args)]
 pub struct GetListenersArg {
     /// Load balancer ARN which contains this listener
-    #[arg(long = "arn")]
-    #[clap(value_parser = utils::token_or_stdin_parser, default_value = "-")]
+    #[arg(long = "arn", required = true)]
+    #[clap(value_parser = utils::token_or_stdin_parser)]
     pub loadbalancer_arn: String,
 }

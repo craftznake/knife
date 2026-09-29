@@ -8,10 +8,20 @@ pub struct AWSEC2Command {
 
 #[derive(Debug, Subcommand)]
 pub enum EC2SubCommand {
+    /// Describe EC2 instance details.
+    Describe(DescribeArg),
     /// Search EC2 instances by name or IP
+    #[command(name = "get", hide = true)]
     Get(SearchArg),
     /// Terminate an EC2 instance (shutdown -> terminate flow)
+    #[command(name = "terminate", hide = true)]
     Terminate(TerminateArg),
+}
+
+#[derive(Debug, Args)]
+pub struct DescribeArg {
+    #[arg(value_name = "ID")]
+    pub id: String,
 }
 
 #[derive(Debug, Args)]
@@ -42,7 +52,7 @@ pub struct SearchArg {
     pub state: Vec<String>,
 }
 
-fn validate_ip_address(s: &str) -> Result<String, String> {
+pub(crate) fn validate_ip_address(s: &str) -> Result<String, String> {
     // Simple IP validation
     if s.contains('.') && s.split('.').count() == 4 {
         // Check if all parts are valid numbers
@@ -72,7 +82,7 @@ fn validate_name(s: &str) -> Result<String, String> {
     }
 }
 
-fn validate_state(s: &str) -> Result<String, String> {
+pub(crate) fn validate_state(s: &str) -> Result<String, String> {
     let valid_states = [
         "pending",
         "running",

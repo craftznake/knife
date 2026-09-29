@@ -2,23 +2,25 @@ use clap::{Args, Subcommand};
 
 #[derive(Debug, Args)]
 pub struct AWSASGCommand {
-    /// ASG name
-    #[arg(long)]
-    pub name: String,
-
     #[command(subcommand)]
     pub command: ASGSubCommand,
+    #[arg(long = "name", required = true)]
+    pub name: String,
 }
 
 #[derive(Debug, Subcommand)]
 pub enum ASGSubCommand {
     /// Get ASG configuration
+    #[command(name = "get", hide = true)]
     Get,
     /// Scale ASG
+    #[command(name = "scale", hide = true)]
     Scale(ScaleArg),
     /// Detach instances
+    #[command(name = "detach-instances", hide = true)]
     DetachInstances(DetachInstancesArg),
     /// Attach instances
+    #[command(name = "attach-instances", hide = true)]
     AttachInstances(AttachInstancesArg),
 }
 

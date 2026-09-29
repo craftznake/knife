@@ -19,6 +19,7 @@ impl AWSEC2Command {
     pub async fn execute(self, opts: GlobalOptions) -> Result<Output, Box<dyn std::error::Error>> {
         let client = Client::new(&opts.sdk_config);
         match self.command {
+            EC2SubCommand::Describe(args) => describe_instance(&client, &args.id, opts).await,
             EC2SubCommand::Get(args) => args.execute(&client, opts).await,
             EC2SubCommand::Terminate(args) => args.execute(&client, opts).await,
         }
@@ -26,6 +27,18 @@ impl AWSEC2Command {
 }
 
 impl SearchArg {
+    pub(crate) fn normalize(&self) -> Result<SearchArg, String> {
+        self.validate()?;
+        Ok(SearchArg {
+            fuzzy: self.fuzzy,
+            private_ip: self.private_ip.clone(),
+            public_ip: self.public_ip.clone(),
+            instance_id: self.instance_id.clone(),
+            name: self.name.clone(),
+            state: self.state.clone(),
+        })
+    }
+
     async fn execute(
         self,
         client: &Client,
@@ -64,7 +77,10 @@ impl SearchArg {
                     }
                 }
 
-                output.stdout(&serde_json::to_string_pretty(&instances).unwrap());
+                output.stdout(&crate::commands::aws::resource::output::render(
+                    &serde_json::to_value(&instances)?,
+                    opts.output_format,
+                )?);
                 Ok(output)
             }
             Err(err) => {
@@ -282,6 +298,27 @@ impl InstanceExt for Instance {
             )
         })
     }
+}
+
+async fn describe_instance(
+    client: &Client,
+    id: &str,
+    opts: GlobalOptions,
+) -> Result<Output, Box<dyn std::error::Error>> {
+    let instance = get_instance_by_id(client, id)
+        .await?
+        .ok_or_else(|| format!("Instance {id} not found"))?;
+    let value = if opts.verbose {
+        instance.long()
+    } else {
+        instance.short()
+    };
+    let output = Output::new(opts.verbose);
+    output.stdout(&crate::commands::aws::resource::output::render(
+        &value,
+        opts.output_format,
+    )?);
+    Ok(output)
 }
 
 impl TerminateArg {

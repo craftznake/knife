@@ -30,18 +30,8 @@ impl StartArg {
         client: &Client,
         opts: GlobalOptions,
     ) -> Result<Output, Box<dyn std::error::Error>> {
-        // Support reading from stdin if arn is "-" or empty
-        let arn = if self.id == "-" {
-            let mut input = String::new();
-            if let Err(e) = std::io::stdin().read_line(&mut input) {
-                return Err(format!("Error reading from stdin: {}", e).into());
-            }
-            input.trim().to_string()
-        } else {
-            self.id.clone()
-        };
-
-        if arn.is_empty() {
+        let instance_id = self.instance_id();
+        if instance_id.is_empty() {
             return Err(format!("Error: Invalid instance ARN.").into());
         }
 
@@ -53,7 +43,7 @@ impl StartArg {
         // Start the session
         match client
             .start_session()
-            .set_target(Some(self.id.clone()))
+            .set_target(Some(instance_id.to_string()))
             .send()
             .await
         {
@@ -70,7 +60,7 @@ impl StartArg {
                 });
 
                 let start_session_params = json!({
-                    "Target": self.id,
+                    "Target": instance_id,
                 });
 
                 // Get region from SDK config

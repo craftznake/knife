@@ -14,12 +14,19 @@ pub struct AWSHandler {
 
 impl CommandHandler for AWSHandler {
     async fn execute(self) -> Result<Output, Box<dyn std::error::Error>> {
+        let mut command_args = self.cmd;
+        crate::commands::aws::resource::handler::validate_ec2_filters(&command_args)?;
+        command_args.normalize_resource()?;
         let AWSCommand {
             command,
             region,
             profile,
+            root_region,
+            root_profile,
             verbose,
-        } = self.cmd;
+            debug,
+            output_format,
+        } = command_args;
 
         // Some commands don't need to load AWS config, just execute them directly
         if let AWSSubCommand::Login(sso_cmd) = command {
@@ -30,19 +37,34 @@ impl CommandHandler for AWSHandler {
             return Ok(output);
         }
 
-        let sdk_config = Self::load_sdk_config(region, profile, verbose).await?;
+        let sdk_config =
+            Self::load_sdk_config(region.or(root_region), profile.or(root_profile), verbose)
+                .await?;
         let opts = GlobalOptions {
-            verbose,
+            verbose: verbose || debug,
             sdk_config,
+            output_format,
         };
 
         // Note: SSO command is handled above before credential loading
         match command {
-            AWSSubCommand::Elb(elb_cmd) => elb_cmd.execute(opts).await,
+            AWSSubCommand::Get(_)
+            | AWSSubCommand::Describe(_)
+            | AWSSubCommand::Delete(_)
+            | AWSSubCommand::Scale(_)
+            | AWSSubCommand::Attach(_)
+            | AWSSubCommand::Detach(_) => {
+                unreachable!("resource commands normalized before dispatch")
+            }
+            AWSSubCommand::LegacyElb(elb_cmd) => elb_cmd.execute(opts).await,
             AWSSubCommand::Whoami(whoami_cmd) => whoami_cmd.execute(opts).await,
-            AWSSubCommand::Route53(route53_cmd) => route53_cmd.execute(opts).await,
-            AWSSubCommand::EC2(ec2_cmd) => ec2_cmd.execute(opts).await,
-            AWSSubCommand::ASG(asg_cmd) => asg_cmd.execute(opts).await,
+            AWSSubCommand::LegacyRoute53(route53_cmd) => route53_cmd.execute(opts).await,
+            AWSSubCommand::EC2Compat(ec2_cmd) => ec2_cmd.execute(opts).await,
+            AWSSubCommand::LegacyASGCompat(args) => {
+                crate::commands::aws::legacy::normalize_asg(args)
+                    .execute(opts)
+                    .await
+            }
             AWSSubCommand::SSM(ssm_cmd) => ssm_cmd.execute(opts).await,
             AWSSubCommand::Console(console_cmd) => console_cmd.execute(opts).await,
             AWSSubCommand::Logout(logout_cmd) => logout_cmd.execute(opts).await,

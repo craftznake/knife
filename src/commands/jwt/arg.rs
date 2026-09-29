@@ -92,7 +92,7 @@ pub struct JWTEncodeArgs {
     pub no_iat: bool,
 
     /// The path of the file to write the result to
-    #[arg(long = "out-file", visible_alias = "out", short = 'o')]
+    #[arg(long = "out-file", visible_alias = "out")]
     pub output_path: Option<PathBuf>,
 
     /// Keep payload claims in the order they were added
@@ -117,8 +117,8 @@ mod tests {
     }
 
     #[test]
-    fn output_path_accepts_all_supported_spellings() {
-        for flag in ["--out-file", "--out", "-o"] {
+    fn output_path_accepts_long_spellings_and_rejects_retired_short_flag() {
+        for flag in ["--out-file", "--out"] {
             let args = TestArgs::try_parse_from([
                 "knife",
                 "jwt",
@@ -143,6 +143,20 @@ mod tests {
                 },
             }
         }
+
+        assert!(
+            TestArgs::try_parse_from([
+                "knife",
+                "jwt",
+                "encode",
+                "{}",
+                "--secret",
+                "secret",
+                "-o",
+                "output.jwt"
+            ])
+            .is_err()
+        );
     }
 }
 
