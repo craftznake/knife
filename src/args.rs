@@ -23,7 +23,7 @@ pub enum Command {
     Base64(Base64Command),
     /// AWS command - works with aws components
     Aws(AWSCommand),
-    /// Activate handle setups knife related functionality for shell.
+    /// Generate shell completion scripts.
     Completion(CompletionCommand),
 }
 
@@ -65,7 +65,7 @@ impl CompletionCommand {
             Ok(path) => path,
             Err(_) => {
                 eprintln!("SHELL environment variable not found");
-                eprintln!("Usage: knife activate --shell <bash|zsh|fish>");
+                eprintln!("Usage: knife completion [bash|zsh|fish]");
                 process::exit(1);
             }
         };
@@ -79,9 +79,38 @@ impl CompletionCommand {
             _ => {
                 eprintln!("Unsupported shell: {}", shell_name);
                 eprintln!("Supported shells: bash, zsh, fish");
-                eprintln!("Usage: knife activate --shell <bash|zsh|fish>");
+                eprintln!("Usage: knife completion [bash|zsh|fish]");
                 process::exit(1);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::KnifeArgs;
+    use clap::CommandFactory;
+
+    #[test]
+    fn completion_help_has_current_syntax_without_stale_terms() {
+        let help = KnifeArgs::command().render_long_help().to_string();
+
+        assert!(!help.contains("activate"));
+        assert!(!help.contains("--shell"));
+        assert!(!help.contains("balacner"));
+        assert!(!help.contains("seperated"));
+    }
+
+    #[test]
+    fn completion_usage_has_current_command_name() {
+        let mut command = KnifeArgs::command();
+        let completion = command.find_subcommand_mut("completion").unwrap();
+        let rendered = completion.render_usage().to_string();
+        let help = completion.render_long_help().to_string();
+
+        assert!(rendered.contains("[SHELL]"));
+        assert!(help.contains("-v"));
+        assert!(!rendered.contains("activate"));
+        assert!(!rendered.contains("--shell"));
     }
 }

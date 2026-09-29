@@ -19,8 +19,8 @@ async fn main() {
     let args = KnifeArgs::parse();
 
     match args.command {
-        Command::Completion(activate_cmd) => {
-            activate_cmd.execute();
+        Command::Completion(completion_cmd) => {
+            completion_cmd.execute();
         }
         Command::Echo(echo_cmd) => {
             let echo_handler = EchoHandler::new(echo_cmd);

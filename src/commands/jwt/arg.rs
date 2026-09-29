@@ -92,12 +92,58 @@ pub struct JWTEncodeArgs {
     pub no_iat: bool,
 
     /// The path of the file to write the result to
-    #[clap(long = "out", short = 'o')]
+    #[arg(long = "out-file", visible_alias = "out", short = 'o')]
     pub output_path: Option<PathBuf>,
 
     /// Keep payload claims in the order they were added
     #[clap(long)]
     pub keep_payload_order: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{JWTCommand, JWTSubCommand};
+    use clap::Parser;
+
+    #[derive(Debug, Parser)]
+    struct TestArgs {
+        #[command(subcommand)]
+        command: TestCommand,
+    }
+
+    #[derive(Debug, clap::Subcommand)]
+    enum TestCommand {
+        Jwt(JWTCommand),
+    }
+
+    #[test]
+    fn output_path_accepts_all_supported_spellings() {
+        for flag in ["--out-file", "--out", "-o"] {
+            let args = TestArgs::try_parse_from([
+                "knife",
+                "jwt",
+                "encode",
+                "{}",
+                "--secret",
+                "secret",
+                flag,
+                "output.jwt",
+            ])
+            .expect("output flag should parse");
+
+            match args.command {
+                TestCommand::Jwt(command) => match command.command {
+                    JWTSubCommand::Encode(encode) => {
+                        assert_eq!(
+                            encode.output_path.as_deref(),
+                            Some(std::path::Path::new("output.jwt"))
+                        );
+                    }
+                    JWTSubCommand::Decode(_) => panic!("expected encode command"),
+                },
+            }
+        }
+    }
 }
 
 #[allow(clippy::upper_case_acronyms)]

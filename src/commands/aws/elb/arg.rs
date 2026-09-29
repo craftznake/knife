@@ -9,9 +9,9 @@ pub struct AWSElbCommand {
 
 #[derive(Debug, Subcommand)]
 pub enum ElbSubCommand {
-    /// Get command - Get load balacner using name
+    /// Get command - Get load balancer using name
     Get(GetArg),
-    /// get-listener - Get load balacner's listener using lb arn
+    /// get-listener - Get load balancer's listener using lb arn
     GetListeners(GetListenersArg),
     /// get-rules - Get listener's rules using listener_arn
     GetRules(GetRulesArg),
@@ -41,7 +41,7 @@ pub struct GetRulesArg {
     #[arg(long)]
     pub num: Option<i8>,
 
-    /// Space seperated key value pair of tag that will be used to filter rule
+    /// Space separated key value pair of tag that will be used to filter rule
     #[arg(long, value_delimiter = ' ', num_args = 2, value_names = ["KEY", "VALUE"])]
     pub tag: Option<Vec<String>>,
 }
