@@ -90,7 +90,7 @@ impl AWSResourceCommand {
                     }),
                     args.output,
                 ),
-                GetKind::ElbListeners(args) => (
+                GetKind::ElbListener(args) => (
                     AWSHandlerCommand::Elb(AWSElbCommand {
                         command: ElbSubCommand::GetListeners(GetListenersArg {
                             loadbalancer_arn: args.arn,
@@ -98,7 +98,7 @@ impl AWSResourceCommand {
                     }),
                     args.output,
                 ),
-                GetKind::ElbRules(args) => (
+                GetKind::ElbRule(args) => (
                     AWSHandlerCommand::Elb(AWSElbCommand {
                         command: ElbSubCommand::GetRules(GetRulesArg {
                             listener_arn: args.arn,

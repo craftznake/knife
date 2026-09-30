@@ -30,6 +30,7 @@ pub struct AWSCommand {
 
     #[arg(skip=OutputFormat::Json)]
     pub output_format: OutputFormat,
+
     #[arg(skip)]
     pub handler_command: Option<(AWSHandlerCommand, OutputFormat)>,
 }

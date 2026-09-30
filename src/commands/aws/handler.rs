@@ -21,8 +21,8 @@ fn recent_target(
         AWSSubCommand::Get(get) => match &get.resource {
             GetKind::Ec2(args) => args.identifier.as_deref().map(|id| ("ec2", id)),
             GetKind::Elb(args) => args.name.as_deref().map(|name| ("elb", name)),
-            GetKind::ElbListeners(args) => Some(("elb-listeners", args.arn.as_str())),
-            GetKind::ElbRules(args) => Some(("elb-rules", args.arn.as_str())),
+            GetKind::ElbListener(args) => Some(("elb-listeners", args.arn.as_str())),
+            GetKind::ElbRule(args) => Some(("elb-rules", args.arn.as_str())),
             GetKind::Asg(args) => Some(("asg", args.name.as_str())),
             GetKind::Route53(args) => Some(("route53", args.domain.as_str())),
         },

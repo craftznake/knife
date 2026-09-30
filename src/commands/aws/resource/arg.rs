@@ -51,21 +51,27 @@ pub struct GetResource {
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum GetKind {
+    /// EC2
     #[command(name = "ec2")]
     Ec2(Ec2Get),
+    /// ELB
     #[command(name = "elb")]
     Elb(ElbGet),
-    #[command(name = "elb-listeners")]
-    ElbListeners(ElbListenersGet),
-    #[command(name = "elb-rules")]
-    ElbRules(ElbRulesGet),
+    /// ELB listener
+    #[command(name = "elb-listener")]
+    ElbListener(ElbListenerGet),
+    /// Elb Listener rule
+    #[command(name = "elb-listener-rule")]
+    ElbRule(ElbRulesGet),
+    /// ASG
     #[command(name = "asg")]
     Asg(AsgGet),
+    /// Route53
     #[command(name = "route53")]
     Route53(Route53Get),
 }
 
-#[derive(Debug, Clone, Args)]
+#[derive(Debug, Args)]
 pub struct Ec2Get {
     #[arg(value_name = "IDENTIFIER", required_unless_present_any = ["selector", "state", "private_ip", "public_ip"], add = crate::recents::completer("ec2"))]
     pub identifier: Option<String>,
@@ -92,7 +98,7 @@ pub struct ElbGet {
     pub output: OutputFormat,
 }
 #[derive(Debug, Args)]
-pub struct ElbListenersGet {
+pub struct ElbListenerGet {
     #[arg(value_name = "LOAD-BALANCER-ARN", add = crate::recents::completer("elb-listeners"))]
     pub arn: String,
     #[arg(short = 'o', long = "output", value_enum, default_value = "json")]
@@ -130,23 +136,28 @@ pub struct DescribeResource {
 }
 #[derive(Debug, Subcommand)]
 pub enum DescribeKind {
+    /// EC2
     #[command(name = "ec2")]
     Ec2(Ec2Describe),
 }
 #[derive(Debug, Args)]
 pub struct Ec2Describe {
+    /// Instance ID
     #[arg(value_name = "ID")]
     pub id: String,
+    /// Output type
     #[arg(short = 'o', long = "output", value_enum, default_value = "json")]
     pub output: OutputFormat,
 }
 #[derive(Debug, Args)]
 pub struct DeleteResource {
+    /// EC2
     #[command(subcommand)]
     pub resource: DeleteKind,
 }
 #[derive(Debug, Subcommand)]
 pub enum DeleteKind {
+    /// EC2
     #[command(name = "ec2")]
     Ec2(Ec2Delete),
 }
@@ -164,6 +175,7 @@ pub struct ScaleResource {
 }
 #[derive(Debug, Subcommand)]
 pub enum ScaleKind {
+    /// ASG
     #[command(name = "asg")]
     Asg(AsgScale),
 }
@@ -187,6 +199,7 @@ pub struct AttachResource {
 }
 #[derive(Debug, Subcommand)]
 pub enum AttachKind {
+    /// ASG
     #[command(name = "asg")]
     Asg(AsgAttach),
 }
@@ -204,6 +217,7 @@ pub struct DetachResource {
 }
 #[derive(Debug, Subcommand)]
 pub enum DetachKind {
+    /// ASG
     #[command(name = "asg")]
     Asg(AsgDetach),
 }
