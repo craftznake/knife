@@ -3,7 +3,7 @@ use aws_config::{BehaviorVersion, Region, SdkConfig};
 use crate::commands::{
     AWSCommand, CommandHandler, Output,
     aws::{
-        arg::{AWSHandlerCommand, GlobalOptions},
+        arg::{AWSHandlerCommand, AWSSubCommand, GlobalOptions},
         login::handler::{load_last_profile, load_last_region},
     },
 };
@@ -12,12 +12,75 @@ pub struct AWSHandler {
     cmd: AWSCommand,
 }
 
+fn recent_target(
+    command: &AWSCommand,
+) -> (Option<String>, Option<&'static str>, Option<String>, bool) {
+    use crate::commands::aws::{arg::AWSSubCommand, resource::arg::GetKind};
+    let profile = command
+        .profile
+        .clone()
+        .or_else(|| command.root_profile.clone());
+    let target = match &command.command {
+        AWSSubCommand::Get(get) => match &get.resource {
+            GetKind::Ec2(args) => args.identifier.as_deref().map(|id| ("ec2", id)),
+            GetKind::Elb(args) => args.name.as_deref().map(|name| ("elb", name)),
+            GetKind::ElbListeners(args) => Some(("elb-listeners", args.arn.as_str())),
+            GetKind::ElbRules(args) => Some(("elb-rules", args.arn.as_str())),
+            GetKind::Asg(args) => Some(("asg", args.name.as_str())),
+            GetKind::Route53(args) => Some(("route53", args.domain.as_str())),
+        },
+        AWSSubCommand::Scale(args) => match &args.resource {
+            crate::commands::aws::resource::arg::ScaleKind::Asg(args) => {
+                Some(("asg", args.name.as_str()))
+            }
+        },
+        AWSSubCommand::Attach(args) => match &args.resource {
+            crate::commands::aws::resource::arg::AttachKind::Asg(args) => {
+                Some(("asg", args.name.as_str()))
+            }
+        },
+        AWSSubCommand::Detach(args) => match &args.resource {
+            crate::commands::aws::resource::arg::DetachKind::Asg(args) => {
+                Some(("asg", args.name.as_str()))
+            }
+        },
+        _ => None,
+    };
+    let is_read = matches!(
+        &command.command,
+        AWSSubCommand::Get(_)
+            | AWSSubCommand::Scale(_)
+            | AWSSubCommand::Attach(_)
+            | AWSSubCommand::Detach(_)
+    );
+    match target {
+        Some((resource, id)) => (profile, Some(resource), Some(id.to_string()), is_read),
+        None => (profile, None, None, false),
+    }
+}
+
+async fn account_id(config: &SdkConfig) -> Option<String> {
+    aws_sdk_sts::Client::new(config)
+        .get_caller_identity()
+        .send()
+        .await
+        .ok()
+        .and_then(|identity| identity.account().map(str::to_owned))
+}
+
 impl CommandHandler for AWSHandler {
     async fn execute(self) -> Result<Output, Box<dyn std::error::Error>> {
         let mut command_args = self.cmd;
-        crate::commands::aws::resource::handler::validate_ec2_filters(&command_args)?;
+        let (_requested_profile, resource, identifier, is_read) = recent_target(&command_args);
         command_args.normalize_resource()?;
         let handler_command = command_args.handler_command;
+        let validation_args = match &command_args.command {
+            AWSSubCommand::Get(get) => match &get.resource {
+                crate::commands::aws::resource::arg::GetKind::Ec2(args) => Some(args.clone()),
+                _ => None,
+            },
+            _ => None,
+        };
         let AWSCommand {
             command,
             region,
@@ -45,29 +108,46 @@ impl CommandHandler for AWSHandler {
             return Ok(output);
         }
 
+        let selected_profile = profile.clone().or(root_profile);
         let sdk_config =
-            Self::load_sdk_config(region.or(root_region), profile.or(root_profile), verbose)
+            Self::load_sdk_config(region.or(root_region), selected_profile.clone(), verbose)
                 .await?;
         let opts = GlobalOptions {
             verbose: verbose || debug,
-            sdk_config,
+            sdk_config: sdk_config.clone(),
             output_format,
         };
 
         // Note: SSO command is handled above before credential loading
-        match command {
-            AWSHandlerCommand::Elb(elb_cmd) => elb_cmd.execute(opts).await,
-            AWSHandlerCommand::Whoami(whoami_cmd) => whoami_cmd.execute(opts).await,
-            AWSHandlerCommand::Route53(route53_cmd) => route53_cmd.execute(opts).await,
-            AWSHandlerCommand::Ec2(ec2_cmd) => ec2_cmd.execute(opts).await,
-            AWSHandlerCommand::Asg(asg_cmd) => asg_cmd.execute(opts).await,
-            AWSHandlerCommand::SSM(ssm_cmd) => ssm_cmd.execute(opts).await,
-            AWSHandlerCommand::Console(console_cmd) => console_cmd.execute(opts).await,
-            AWSHandlerCommand::Logout(logout_cmd) => logout_cmd.execute(opts).await,
+        let output = match command {
+            AWSHandlerCommand::Elb(elb_cmd) => elb_cmd.execute(opts).await?,
+            AWSHandlerCommand::Whoami(whoami_cmd) => whoami_cmd.execute(opts).await?,
+            AWSHandlerCommand::Route53(route53_cmd) => route53_cmd.execute(opts).await?,
+            AWSHandlerCommand::Ec2(ec2_cmd) => {
+                if let Some(args) = &validation_args {
+                    args.validate()?;
+                }
+                ec2_cmd.execute(opts).await?
+            }
+            AWSHandlerCommand::Asg(asg_cmd) => asg_cmd.execute(opts).await?,
+            AWSHandlerCommand::SSM(ssm_cmd) => ssm_cmd.execute(opts).await?,
+            AWSHandlerCommand::Console(console_cmd) => console_cmd.execute(opts).await?,
+            AWSHandlerCommand::Logout(logout_cmd) => logout_cmd.execute(opts).await?,
             AWSHandlerCommand::Login(_) => {
                 unreachable!("SSO command should have been handled earlier")
             }
+        };
+        if let (Some(resource), Some(identifier)) = (resource, identifier) {
+            let active_profile = _requested_profile
+                .or_else(|| profile.clone())
+                .or_else(|| std::env::var("AWS_PROFILE").ok())
+                .or_else(load_last_profile)
+                .unwrap_or_else(|| "default".to_string());
+            if is_read && let Some(account_id) = account_id(&sdk_config).await {
+                crate::recents::record(&active_profile, &account_id, resource, &identifier);
+            }
         }
+        Ok(output)
     }
 }
 

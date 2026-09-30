@@ -13,7 +13,7 @@ pub fn aws_datetime_to_local(aws_dt: &AwsDateTime) -> DateTime<Local> {
 /// Get the knife config directory path (~/.knife)
 pub fn get_config_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let home = std::env::var("HOME").map_err(|_| -> Box<dyn std::error::Error> {
-        format!("HOME environment variable not set").into()
+        "HOME environment variable not set".to_string().into()
     })?;
 
     let config_dir = PathBuf::from(home).join(".knife");

@@ -17,6 +17,6 @@ pub enum SSMSubCommand {
 #[derive(Debug, Args)]
 pub struct StartArg {
     /// Instance ID to start a session with.
-    #[arg(value_name = "INSTANCE-ID")]
+    #[arg(value_name = "INSTANCE-ID", add = crate::recents::completer("ec2"))]
     pub id: String,
 }

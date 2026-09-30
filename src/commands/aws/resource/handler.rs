@@ -4,80 +4,24 @@ use super::{
         asg::arg::{
             ASGSubCommand, AWSASGCommand, AttachInstancesArg, DetachInstancesArg, ScaleArg,
         },
-        ec2::arg::{AWSEC2Command, DescribeArg, EC2SubCommand, SearchArg, TerminateArg},
+        ec2::arg::{AWSEC2Command, DescribeArg, EC2SubCommand, TerminateArg},
         elb::arg::{AWSElbCommand, ElbSubCommand, GetArg, GetListenersArg, GetRulesArg},
         route53::arg::{AWSRoute53Command, Route53SubCommand},
     },
     arg::*,
 };
-pub fn validate_ec2_filters(aws: &AWSCommand) -> Result<(), String> {
-    let AWSSubCommand::Get(GetResource {
-        resource: GetKind::Ec2(args),
-    }) = &aws.command
-    else {
-        return Ok(());
-    };
-
-    if !args.state.is_empty() && (args.private_ip.is_some() || args.public_ip.is_some()) {
-        return Err("--state cannot be combined with --private-ip or --public-ip".into());
-    }
-    if let Some(selector) = &args.selector {
-        for entry in selector {
-            let Some((key, value)) = entry.split_once('=') else {
-                return Err(format!("selector must be KEY=VALUE: {entry}"));
-            };
-            if value.is_empty() {
-                return Err(format!("selector must be KEY=VALUE: {entry}"));
-            }
-            if !matches!(key, "name" | "id") {
-                return Err(format!(
-                    "unsupported EC2 selector key: {key} (supported: name, id)"
-                ));
-            }
-        }
-    }
-    Ok(())
-}
-
 impl AWSResourceCommand {
     pub fn into_handler(self) -> Result<(AWSHandlerCommand, OutputFormat), String> {
         let (command, format) = match self.into_verb() {
             ResourceVerb::Get(get) => match get.resource {
                 GetKind::Ec2(args) => {
-                    let selector = args.selector.unwrap_or_default();
-                    let (name, instance_id) =
-                        selector.iter().fold((None, None), |(name, id), pair| {
-                            let (key, value) = pair
-                                .split_once('=')
-                                .expect("selector validated before normalization");
-                            match key {
-                                "name" => (Some(value.to_owned()), id),
-                                "id" => (name, Some(value.to_owned())),
-                                _ => unreachable!("unsupported EC2 selectors are rejected"),
-                            }
-                        });
-                    let identifier = args.identifier;
-                    let name = name.or_else(|| {
-                        identifier
-                            .as_ref()
-                            .filter(|s| !s.starts_with("i-"))
-                            .cloned()
-                    });
-                    let instance_id =
-                        instance_id.or_else(|| identifier.filter(|s| s.starts_with("i-")));
-                    let search = SearchArg {
-                        fuzzy: false,
-                        private_ip: args.private_ip,
-                        public_ip: args.public_ip,
-                        instance_id,
-                        name,
-                        state: args.state,
-                    };
+                    let output = args.output;
+                    let search = args.normalize()?;
                     (
                         AWSHandlerCommand::Ec2(AWSEC2Command {
                             command: EC2SubCommand::Get(search.normalize()?),
                         }),
-                        args.output,
+                        output,
                     )
                 }
                 GetKind::Elb(args) => (

@@ -65,6 +65,11 @@ impl CompletionCommand {
             eprintln!("try to generate completion scripts for {shell}");
         }
 
+        let exe = std::env::current_exe().expect("knife executable path");
+        clap_complete::CompleteEnv::with_factory(KnifeArgs::command)
+            .bin("knife")
+            .completer(exe.to_string_lossy())
+            .complete();
         generate(shell, &mut cmd, "knife", &mut std::io::stdout());
     }
 

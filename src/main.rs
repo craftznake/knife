@@ -1,9 +1,10 @@
 mod args;
 mod commands;
+mod recents;
 mod shells;
 
 use args::{Command, KnifeArgs};
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 
 use crate::commands::{AWSHandler, Base64Handler, CommandHandler, EchoHandler, JWTHandler};
 
@@ -16,6 +17,9 @@ async fn main() {
         libc::signal(libc::SIGPIPE, libc::SIG_DFL);
     }
 
+    clap_complete::CompleteEnv::with_factory(KnifeArgs::command)
+        .bin("knife")
+        .complete();
     let args = KnifeArgs::parse();
     let root_region = args.region.clone();
     let root_profile = args.profile.clone();

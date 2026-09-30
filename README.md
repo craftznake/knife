@@ -24,6 +24,7 @@ A Rust-based CLI tool which includes my daily development tools/toils.
    ```bash
    eval "$(knife completion $(basename $SHELL) 2>/dev/null)"
    ```
+   The registration includes dynamic identifier suggestions. Set `KNIFE_DISABLE_RECENTS=1` to disable the local recents cache and dynamic suggestions. The `eval knife completion ...` instructions above remain supported.
    or add this below line to your shell configuration
    ```bash
    if type knife 1>/dev/null 2>&1; then

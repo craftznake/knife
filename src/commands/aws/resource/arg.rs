@@ -65,9 +65,9 @@ pub enum GetKind {
     Route53(Route53Get),
 }
 
-#[derive(Debug, Args)]
+#[derive(Debug, Clone, Args)]
 pub struct Ec2Get {
-    #[arg(value_name = "IDENTIFIER", required_unless_present_any = ["selector", "state", "private_ip", "public_ip"])]
+    #[arg(value_name = "IDENTIFIER", required_unless_present_any = ["selector", "state", "private_ip", "public_ip"], add = crate::recents::completer("ec2"))]
     pub identifier: Option<String>,
     #[arg(long="selector", value_delimiter=',', value_parser=parse_selector, num_args=1..)]
     pub selector: Option<Vec<String>>,
@@ -82,7 +82,7 @@ pub struct Ec2Get {
 }
 #[derive(Debug, Args)]
 pub struct ElbGet {
-    #[arg(value_name = "NAME")]
+    #[arg(value_name = "NAME", add = crate::recents::completer("elb"))]
     pub name: Option<String>,
     #[arg(long)]
     pub limit: Option<i8>,
@@ -93,14 +93,14 @@ pub struct ElbGet {
 }
 #[derive(Debug, Args)]
 pub struct ElbListenersGet {
-    #[arg(value_name = "LOAD-BALANCER-ARN")]
+    #[arg(value_name = "LOAD-BALANCER-ARN", add = crate::recents::completer("elb-listeners"))]
     pub arn: String,
     #[arg(short = 'o', long = "output", value_enum, default_value = "json")]
     pub output: OutputFormat,
 }
 #[derive(Debug, Args)]
 pub struct ElbRulesGet {
-    #[arg(value_name = "LISTENER-ARN")]
+    #[arg(value_name = "LISTENER-ARN", add = crate::recents::completer("elb-rules"))]
     pub arn: String,
     #[arg(short='l',long="selector",value_delimiter=',',value_parser=parse_selector, num_args=1..)]
     pub selector: Option<Vec<String>>,
@@ -111,14 +111,14 @@ pub struct ElbRulesGet {
 }
 #[derive(Debug, Args)]
 pub struct AsgGet {
-    #[arg(value_name = "NAME")]
+    #[arg(value_name = "NAME", add = crate::recents::completer("asg"))]
     pub name: String,
     #[arg(short = 'o', long = "output", value_enum, default_value = "json")]
     pub output: OutputFormat,
 }
 #[derive(Debug, Args)]
 pub struct Route53Get {
-    #[arg(value_name = "DOMAIN")]
+    #[arg(value_name = "DOMAIN", add = crate::recents::completer("route53"))]
     pub domain: String,
     #[arg(short = 'o', long = "output", value_enum, default_value = "json")]
     pub output: OutputFormat,
@@ -169,7 +169,7 @@ pub enum ScaleKind {
 }
 #[derive(Debug, Args)]
 pub struct AsgScale {
-    #[arg(value_name = "NAME")]
+    #[arg(value_name = "NAME", add = crate::recents::completer("asg"))]
     pub name: String,
     #[arg(long = "min")]
     pub min_size: Option<i32>,
@@ -192,7 +192,7 @@ pub enum AttachKind {
 }
 #[derive(Debug, Args)]
 pub struct AsgAttach {
-    #[arg(value_name = "NAME")]
+    #[arg(value_name = "NAME", add = crate::recents::completer("asg"))]
     pub name: String,
     #[arg(value_name="INSTANCE-ID",required=true,num_args=1..)]
     pub ids: Vec<String>,
@@ -209,7 +209,7 @@ pub enum DetachKind {
 }
 #[derive(Debug, Args)]
 pub struct AsgDetach {
-    #[arg(value_name = "NAME")]
+    #[arg(value_name = "NAME", add = crate::recents::completer("asg"))]
     pub name: String,
     #[arg(value_name="INSTANCE-ID",required=true,num_args=1..)]
     pub ids: Vec<String>,
