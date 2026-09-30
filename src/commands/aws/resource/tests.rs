@@ -105,12 +105,16 @@ fn context_flags_and_output_formats_parse() {
             "i-1",
         ],
         vec!["knife", "aws", "get", "ec2", "i-1", "-o", "yaml"],
-        vec!["knife", "aws", "get", "ec2", "i-1", "--output", "table"],
+        vec!["knife", "aws", "-o", "table", "get", "ec2", "i-1"],
     ] {
         parse(&argv);
     }
     assert_eq!(
         output_format(&["knife", "aws", "get", "ec2", "i-1", "-o", "yaml"]),
+        OutputFormat::Yaml
+    );
+    assert_eq!(
+        output_format(&["knife", "aws", "-o", "yaml", "get", "ec2", "i-1"]),
         OutputFormat::Yaml
     );
 }
@@ -139,21 +143,24 @@ fn required_identifiers_and_filter_requirements_are_enforced() {
         "--private-ip",
         "1.2.3.4",
     ]);
-    let crate::args::Command::Aws(aws) = parsed.command else {
+    let crate::args::Command::Aws(mut aws) = parsed.command else {
         panic!("expected AWS")
     };
-    let Err(error) = crate::commands::aws::resource::handler::validate_ec2_filters(&aws) else {
-        panic!("expected incompatible-filter error")
-    };
-    assert!(error.contains("--state cannot be combined"));
-    let parsed = parse(&["knife", "aws", "get", "ec2", "--selector", "tag=blue"]);
-    let crate::args::Command::Aws(aws) = parsed.command else {
+    assert!(aws.normalize_resource().is_err());
+
+    let crate::args::Command::Aws(mut aws) =
+        parse(&["knife", "aws", "get", "ec2", "--selector", "tag=blue"]).command
+    else {
         panic!("expected AWS")
     };
-    let Err(error) = crate::commands::aws::resource::handler::validate_ec2_filters(&aws) else {
-        panic!("expected unsupported selector error")
+    assert!(aws.normalize_resource().is_err());
+
+    let crate::args::Command::Aws(mut aws) =
+        parse(&["knife", "aws", "get", "ec2", "--selector", "name=api"]).command
+    else {
+        panic!("expected AWS")
     };
-    assert!(error.contains("unsupported EC2 selector key"));
+    aws.normalize_resource().unwrap();
 }
 
 #[test]

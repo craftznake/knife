@@ -10,52 +10,38 @@ use super::{
     },
     arg::*,
 };
-pub fn validate_ec2_filters(aws: &AWSCommand) -> Result<(), String> {
-    let AWSSubCommand::Get(GetResource {
-        resource: GetKind::Ec2(args),
-    }) = &aws.command
-    else {
-        return Ok(());
-    };
-
-    if !args.state.is_empty() && (args.private_ip.is_some() || args.public_ip.is_some()) {
-        return Err("--state cannot be combined with --private-ip or --public-ip".into());
-    }
-    if let Some(selector) = &args.selector {
-        for entry in selector {
-            let Some((key, value)) = entry.split_once('=') else {
-                return Err(format!("selector must be KEY=VALUE: {entry}"));
-            };
-            if value.is_empty() {
-                return Err(format!("selector must be KEY=VALUE: {entry}"));
-            }
-            if !matches!(key, "name" | "id") {
-                return Err(format!(
-                    "unsupported EC2 selector key: {key} (supported: name, id)"
-                ));
-            }
-        }
-    }
-    Ok(())
-}
-
 impl AWSResourceCommand {
-    pub fn into_handler(self) -> Result<(AWSHandlerCommand, OutputFormat), String> {
+    pub fn into_handler(
+        self,
+        output_format: OutputFormat,
+    ) -> Result<(AWSHandlerCommand, OutputFormat), String> {
         let (command, format) = match self.into_verb() {
             ResourceVerb::Get(get) => match get.resource {
                 GetKind::Ec2(args) => {
+                    if !args.state.is_empty()
+                        && (args.private_ip.is_some() || args.public_ip.is_some())
+                    {
+                        return Err(
+                            "--state cannot be combined with --private-ip or --public-ip".into(),
+                        );
+                    }
                     let selector = args.selector.unwrap_or_default();
                     let (name, instance_id) =
-                        selector.iter().fold((None, None), |(name, id), pair| {
+                        selector.iter().try_fold((None, None), |(name, id), pair| {
                             let (key, value) = pair
                                 .split_once('=')
-                                .expect("selector validated before normalization");
-                            match key {
-                                "name" => (Some(value.to_owned()), id),
-                                "id" => (name, Some(value.to_owned())),
-                                _ => unreachable!("unsupported EC2 selectors are rejected"),
+                                .ok_or_else(|| format!("selector must be KEY=VALUE: {pair}"))?;
+                            if value.is_empty() {
+                                return Err(format!("selector must be KEY=VALUE: {pair}"));
                             }
-                        });
+                            match key {
+                                "name" => Ok((Some(value.to_owned()), id)),
+                                "id" => Ok((name, Some(value.to_owned()))),
+                                _ => Err(format!(
+                                    "unsupported EC2 selector key: {key} (supported: name, id)"
+                                )),
+                            }
+                        })?;
                     let identifier = args.identifier;
                     let name = name.or_else(|| {
                         identifier
@@ -77,7 +63,7 @@ impl AWSResourceCommand {
                         AWSHandlerCommand::Ec2(AWSEC2Command {
                             command: EC2SubCommand::Get(search.normalize()?),
                         }),
-                        args.output,
+                        output_format,
                     )
                 }
                 GetKind::Elb(args) => (
@@ -88,7 +74,7 @@ impl AWSResourceCommand {
                             fuzzy: !args.exact,
                         }),
                     }),
-                    args.output,
+                    output_format,
                 ),
                 GetKind::ElbListener(args) => (
                     AWSHandlerCommand::Elb(AWSElbCommand {
@@ -96,7 +82,7 @@ impl AWSResourceCommand {
                             loadbalancer_arn: args.arn,
                         }),
                     }),
-                    args.output,
+                    output_format,
                 ),
                 GetKind::ElbRule(args) => (
                     AWSHandlerCommand::Elb(AWSElbCommand {
@@ -116,14 +102,14 @@ impl AWSResourceCommand {
                             }),
                         }),
                     }),
-                    args.output,
+                    output_format,
                 ),
                 GetKind::Asg(args) => (
                     AWSHandlerCommand::Asg(AWSASGCommand {
                         name: args.name,
                         command: ASGSubCommand::Get,
                     }),
-                    args.output,
+                    output_format,
                 ),
                 GetKind::Route53(args) => (
                     AWSHandlerCommand::Route53(AWSRoute53Command {
@@ -131,7 +117,7 @@ impl AWSResourceCommand {
                             domain: args.domain,
                         },
                     }),
-                    args.output,
+                    output_format,
                 ),
             },
             ResourceVerb::Describe(args) => match args.resource {
@@ -139,7 +125,7 @@ impl AWSResourceCommand {
                     AWSHandlerCommand::Ec2(AWSEC2Command {
                         command: EC2SubCommand::Describe(DescribeArg { id: args.id }),
                     }),
-                    args.output,
+                    output_format,
                 ),
             },
             ResourceVerb::Delete(args) => match args.resource {
@@ -150,7 +136,7 @@ impl AWSResourceCommand {
                             yes: args.yes,
                         }),
                     }),
-                    OutputFormat::Json,
+                    output_format,
                 ),
             },
             ResourceVerb::Scale(args) => match args.resource {
@@ -164,7 +150,7 @@ impl AWSResourceCommand {
                             yes: args.yes,
                         }),
                     }),
-                    OutputFormat::Json,
+                    output_format,
                 ),
             },
             ResourceVerb::Attach(args) => match args.resource {
@@ -175,7 +161,7 @@ impl AWSResourceCommand {
                             ids: args.ids,
                         }),
                     }),
-                    OutputFormat::Json,
+                    output_format,
                 ),
             },
             ResourceVerb::Detach(args) => match args.resource {
@@ -188,7 +174,7 @@ impl AWSResourceCommand {
                             yes: args.yes,
                         }),
                     }),
-                    OutputFormat::Json,
+                    output_format,
                 ),
             },
         };
@@ -233,7 +219,8 @@ impl AWSCommand {
                 AWSSubCommand::Detach(value) => ResourceVerb::Detach(value),
                 _ => unreachable!(),
             };
-            let (command, format) = AWSResourceCommand::from_verb(verb).into_handler()?;
+            let (command, format) =
+                AWSResourceCommand::from_verb(verb).into_handler(self.output_format)?;
             self.handler_command = Some((command, format));
             self.output_format = format;
         }

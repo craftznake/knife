@@ -17,28 +17,40 @@ use aws_config::SdkConfig;
 use clap::{Args, Subcommand, ValueEnum};
 #[derive(Debug, Args)]
 pub struct AWSCommand {
+    /// Output format for AWS resource operations.
+    #[arg(
+        long = "output",
+        short = 'o',
+        value_enum,
+        global = true,
+        default_value = "json"
+    )]
+    pub output_format: OutputFormat,
+    /// AWS region context for AWS service operations.
     #[arg(long, short = 'r', global = true)]
     pub region: Option<String>,
+    /// AWS profile used for authentication.
     #[arg(long, short = 'p', global = true)]
     pub profile: Option<String>,
+    /// Enable verbose logging.
     #[arg(long, short = 'v', global = true)]
     pub verbose: bool,
+    /// Enable debug logging.
     #[arg(long, global = true)]
     pub debug: bool,
+    /// AWS operation to execute.
     #[command(subcommand)]
     pub command: AWSSubCommand,
-
-    #[arg(skip=OutputFormat::Json)]
-    pub output_format: OutputFormat,
 
     #[arg(skip)]
     pub handler_command: Option<(AWSHandlerCommand, OutputFormat)>,
 }
 
+/// AWS top-level operations.
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
 pub enum AWSSubCommand {
-    /// Read AWS resources.
+    /// Read an AWS resource.
     #[command(name = "get")]
     Get(GetResource),
 
@@ -62,26 +74,27 @@ pub enum AWSSubCommand {
     #[command(name = "detach")]
     Detach(DetachResource),
 
-    /// Whoami describe the current logged in user.
+    /// Describe the currently authenticated user.
     #[command(name = "whoami")]
     Whoami(AWSWhoAmICommand),
 
-    /// Session Manager
+    /// Start an AWS Systems Manager session.
     #[command(name = "ssm")]
     SSM(AWSSSMCommand),
 
-    /// Login AWS using sso profile
+    /// Log in to AWS with an SSO profile.
     #[command(name = "login")]
     Login(AWSLoginCommand),
 
-    /// Logout current SSO session
+    /// Log out of the current SSO session.
     #[command(name = "logout")]
     Logout(AWSLogoutCommand),
 
-    /// Web Console
+    /// Open the AWS web console.
     #[command(name = "console")]
     Console(AWSConsoleCommand),
 }
+/// Internal AWS command dispatched to a service handler.
 #[derive(Debug)]
 pub enum AWSHandlerCommand {
     Ec2(AWSEC2Command),
@@ -120,6 +133,7 @@ pub struct GlobalOptions {
     pub verbose: bool,
     pub output_format: OutputFormat,
 }
+/// Output encoding used for AWS resource responses.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, ValueEnum)]
 #[value(rename_all = "lowercase")]
 pub enum OutputFormat {

@@ -17,76 +17,12 @@ use tokio::time::{Duration, Instant, interval};
 
 impl AWSEC2Command {
     pub async fn execute(self, opts: GlobalOptions) -> Result<Output, Box<dyn std::error::Error>> {
-        if let EC2SubCommand::Get(args) = &self.command {
-            args.validate()?;
-        }
         let client = Client::new(&opts.sdk_config);
         match self.command {
             EC2SubCommand::Describe(args) => describe_instance(&client, &args.id, opts).await,
             EC2SubCommand::Get(args) => args.execute(&client, opts).await,
             EC2SubCommand::Terminate(args) => args.execute(&client, opts).await,
         }
-    }
-}
-
-pub(crate) fn validate_filters(
-    args: &crate::commands::aws::resource::arg::Ec2Get,
-) -> Result<(), String> {
-    if !args.state.is_empty() && (args.private_ip.is_some() || args.public_ip.is_some()) {
-        return Err("--state cannot be combined with --private-ip or --public-ip".into());
-    }
-    if let Some(selector) = &args.selector {
-        for entry in selector {
-            let Some((key, value)) = entry.split_once('=') else {
-                return Err(format!("selector must be KEY=VALUE: {entry}"));
-            };
-            if value.is_empty() {
-                return Err(format!("selector must be KEY=VALUE: {entry}"));
-            }
-            if !matches!(key, "name" | "id") {
-                return Err(format!(
-                    "unsupported EC2 selector key: {key} (supported: name, id)"
-                ));
-            }
-        }
-    }
-    Ok(())
-}
-
-impl crate::commands::aws::resource::arg::Ec2Get {
-    pub(crate) fn validate(&self) -> Result<(), String> {
-        validate_filters(self)
-    }
-
-    pub(crate) fn normalize(&self) -> Result<SearchArg, String> {
-        validate_filters(self)?;
-        let selector = self.selector.as_deref().unwrap_or_default();
-        let (name, instance_id) = selector.iter().fold((None, None), |(name, id), pair| {
-            let (key, value) = pair.split_once('=').expect("selector validated above");
-            match key {
-                "name" => (Some(value.to_owned()), id),
-                "id" => (name, Some(value.to_owned())),
-                _ => unreachable!("unsupported selector validated above"),
-            }
-        });
-        let identifier = self.identifier.clone();
-        let name = name.or_else(|| {
-            identifier
-                .as_ref()
-                .filter(|s| !s.starts_with("i-"))
-                .cloned()
-        });
-        let instance_id = instance_id.or_else(|| identifier.filter(|s| s.starts_with("i-")));
-        let normalized = SearchArg {
-            fuzzy: false,
-            private_ip: self.private_ip.clone(),
-            public_ip: self.public_ip.clone(),
-            instance_id,
-            name,
-            state: self.state.clone(),
-        };
-        normalized.validate()?;
-        Ok(normalized)
     }
 }
 

@@ -69,7 +69,6 @@ impl CommandHandler for AWSHandler {
     async fn execute(self) -> Result<Output, Box<dyn std::error::Error>> {
         let mut command_args = self.cmd;
         let (_requested_profile, resource, identifier, is_read) = recent_target(&command_args);
-        crate::commands::aws::resource::handler::validate_ec2_filters(&command_args)?;
         command_args.normalize_resource()?;
         let handler_command = command_args.handler_command;
         let AWSCommand {
