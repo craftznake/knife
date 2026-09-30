@@ -11,10 +11,8 @@ pub enum EC2SubCommand {
     /// Describe EC2 instance details.
     Describe(DescribeArg),
     /// Search EC2 instances by name or IP
-    #[command(name = "get", hide = true)]
     Get(SearchArg),
     /// Terminate an EC2 instance (shutdown -> terminate flow)
-    #[command(name = "terminate", hide = true)]
     Terminate(TerminateArg),
 }
 

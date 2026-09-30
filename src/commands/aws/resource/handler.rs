@@ -1,7 +1,10 @@
 use super::{
     super::{
-        arg::{AWSCommand, AWSSubCommand, OutputFormat},
-        ec2::arg::{AWSEC2Command, EC2SubCommand, SearchArg, TerminateArg},
+        arg::{AWSCommand, AWSHandlerCommand, AWSSubCommand, OutputFormat},
+        asg::arg::{
+            ASGSubCommand, AWSASGCommand, AttachInstancesArg, DetachInstancesArg, ScaleArg,
+        },
+        ec2::arg::{AWSEC2Command, DescribeArg, EC2SubCommand, SearchArg, TerminateArg},
         elb::arg::{AWSElbCommand, ElbSubCommand, GetArg, GetListenersArg, GetRulesArg},
         route53::arg::{AWSRoute53Command, Route53SubCommand},
     },
@@ -37,7 +40,7 @@ pub fn validate_ec2_filters(aws: &AWSCommand) -> Result<(), String> {
 }
 
 impl AWSResourceCommand {
-    pub fn normalize(self) -> Result<(AWSSubCommand, OutputFormat), String> {
+    pub fn into_handler(self) -> Result<(AWSHandlerCommand, OutputFormat), String> {
         let (command, format) = match self.into_verb() {
             ResourceVerb::Get(get) => match get.resource {
                 GetKind::Ec2(args) => {
@@ -71,14 +74,14 @@ impl AWSResourceCommand {
                         state: args.state,
                     };
                     (
-                        AWSSubCommand::EC2Compat(AWSEC2Command {
+                        AWSHandlerCommand::Ec2(AWSEC2Command {
                             command: EC2SubCommand::Get(search.normalize()?),
                         }),
                         args.output,
                     )
                 }
                 GetKind::Elb(args) => (
-                    AWSSubCommand::LegacyElb(AWSElbCommand {
+                    AWSHandlerCommand::Elb(AWSElbCommand {
                         command: ElbSubCommand::Get(GetArg {
                             name: args.name.unwrap_or_default(),
                             num: args.limit,
@@ -88,7 +91,7 @@ impl AWSResourceCommand {
                     args.output,
                 ),
                 GetKind::ElbListeners(args) => (
-                    AWSSubCommand::LegacyElb(AWSElbCommand {
+                    AWSHandlerCommand::Elb(AWSElbCommand {
                         command: ElbSubCommand::GetListeners(GetListenersArg {
                             loadbalancer_arn: args.arn,
                         }),
@@ -96,7 +99,7 @@ impl AWSResourceCommand {
                     args.output,
                 ),
                 GetKind::ElbRules(args) => (
-                    AWSSubCommand::LegacyElb(AWSElbCommand {
+                    AWSHandlerCommand::Elb(AWSElbCommand {
                         command: ElbSubCommand::GetRules(GetRulesArg {
                             listener_arn: args.arn,
                             num: args.limit,
@@ -116,14 +119,14 @@ impl AWSResourceCommand {
                     args.output,
                 ),
                 GetKind::Asg(args) => (
-                    AWSSubCommand::LegacyASGCompat(crate::commands::aws::legacy::LegacyASG {
+                    AWSHandlerCommand::Asg(AWSASGCommand {
                         name: args.name,
-                        command: crate::commands::aws::legacy::LegacyASGCommand::Get,
+                        command: ASGSubCommand::Get,
                     }),
                     args.output,
                 ),
                 GetKind::Route53(args) => (
-                    AWSSubCommand::LegacyRoute53(AWSRoute53Command {
+                    AWSHandlerCommand::Route53(AWSRoute53Command {
                         command: Route53SubCommand::Get {
                             domain: args.domain,
                         },
@@ -133,17 +136,15 @@ impl AWSResourceCommand {
             },
             ResourceVerb::Describe(args) => match args.resource {
                 DescribeKind::Ec2(args) => (
-                    AWSSubCommand::EC2Compat(AWSEC2Command {
-                        command: EC2SubCommand::Describe(
-                            crate::commands::aws::ec2::arg::DescribeArg { id: args.id },
-                        ),
+                    AWSHandlerCommand::Ec2(AWSEC2Command {
+                        command: EC2SubCommand::Describe(DescribeArg { id: args.id }),
                     }),
                     args.output,
                 ),
             },
             ResourceVerb::Delete(args) => match args.resource {
                 DeleteKind::Ec2(args) => (
-                    AWSSubCommand::EC2Compat(AWSEC2Command {
+                    AWSHandlerCommand::Ec2(AWSEC2Command {
                         command: EC2SubCommand::Terminate(TerminateArg {
                             instance_id: args.id,
                             yes: args.yes,
@@ -154,38 +155,38 @@ impl AWSResourceCommand {
             },
             ResourceVerb::Scale(args) => match args.resource {
                 ScaleKind::Asg(args) => (
-                    AWSSubCommand::LegacyASGCompat(crate::commands::aws::legacy::LegacyASG {
+                    AWSHandlerCommand::Asg(AWSASGCommand {
                         name: args.name,
-                        command: crate::commands::aws::legacy::LegacyASGCommand::Scale {
-                            min: args.min_size,
-                            max: args.max_size,
-                            desired: args.desired_capacity,
+                        command: ASGSubCommand::Scale(ScaleArg {
+                            min_size: args.min_size,
+                            max_size: args.max_size,
+                            desired_capacity: args.desired_capacity,
                             yes: args.yes,
-                        },
+                        }),
                     }),
                     OutputFormat::Json,
                 ),
             },
             ResourceVerb::Attach(args) => match args.resource {
                 AttachKind::Asg(args) => (
-                    AWSSubCommand::LegacyASGCompat(crate::commands::aws::legacy::LegacyASG {
+                    AWSHandlerCommand::Asg(AWSASGCommand {
                         name: args.name,
-                        command: crate::commands::aws::legacy::LegacyASGCommand::AttachInstances {
+                        command: ASGSubCommand::AttachInstances(AttachInstancesArg {
                             ids: args.ids,
-                        },
+                        }),
                     }),
                     OutputFormat::Json,
                 ),
             },
             ResourceVerb::Detach(args) => match args.resource {
                 DetachKind::Asg(args) => (
-                    AWSSubCommand::LegacyASGCompat(crate::commands::aws::legacy::LegacyASG {
+                    AWSHandlerCommand::Asg(AWSASGCommand {
                         name: args.name,
-                        command: crate::commands::aws::legacy::LegacyASGCommand::DetachInstances {
+                        command: ASGSubCommand::DetachInstances(DetachInstancesArg {
                             ids: args.ids,
                             replace: args.replace,
                             yes: args.yes,
-                        },
+                        }),
                     }),
                     OutputFormat::Json,
                 ),
@@ -232,8 +233,8 @@ impl AWSCommand {
                 AWSSubCommand::Detach(value) => ResourceVerb::Detach(value),
                 _ => unreachable!(),
             };
-            let (command, format) = AWSResourceCommand::from_verb(verb).normalize()?;
-            self.command = command;
+            let (command, format) = AWSResourceCommand::from_verb(verb).into_handler()?;
+            self.handler_command = Some((command, format));
             self.output_format = format;
         }
         Ok(())

@@ -3,7 +3,7 @@ use aws_config::{BehaviorVersion, Region, SdkConfig};
 use crate::commands::{
     AWSCommand, CommandHandler, Output,
     aws::{
-        arg::{AWSSubCommand, GlobalOptions},
+        arg::{AWSHandlerCommand, GlobalOptions},
         login::handler::{load_last_profile, load_last_region},
     },
 };
@@ -17,6 +17,7 @@ impl CommandHandler for AWSHandler {
         let mut command_args = self.cmd;
         crate::commands::aws::resource::handler::validate_ec2_filters(&command_args)?;
         command_args.normalize_resource()?;
+        let handler_command = command_args.handler_command;
         let AWSCommand {
             command,
             region,
@@ -26,10 +27,17 @@ impl CommandHandler for AWSHandler {
             verbose,
             debug,
             output_format,
+            ..
         } = command_args;
 
         // Some commands don't need to load AWS config, just execute them directly
-        if let AWSSubCommand::Login(sso_cmd) = command {
+        let output_format = handler_command
+            .as_ref()
+            .map_or(output_format, |(_, format)| *format);
+        let command = handler_command
+            .map(|(command, _)| command)
+            .unwrap_or_else(|| command.into());
+        if let AWSHandlerCommand::Login(sso_cmd) = command {
             // SSO login doesn't require credentials
             let _ = sso_cmd.execute(verbose).await;
             let output = Output::new(verbose);
@@ -48,27 +56,15 @@ impl CommandHandler for AWSHandler {
 
         // Note: SSO command is handled above before credential loading
         match command {
-            AWSSubCommand::Get(_)
-            | AWSSubCommand::Describe(_)
-            | AWSSubCommand::Delete(_)
-            | AWSSubCommand::Scale(_)
-            | AWSSubCommand::Attach(_)
-            | AWSSubCommand::Detach(_) => {
-                unreachable!("resource commands normalized before dispatch")
-            }
-            AWSSubCommand::LegacyElb(elb_cmd) => elb_cmd.execute(opts).await,
-            AWSSubCommand::Whoami(whoami_cmd) => whoami_cmd.execute(opts).await,
-            AWSSubCommand::LegacyRoute53(route53_cmd) => route53_cmd.execute(opts).await,
-            AWSSubCommand::EC2Compat(ec2_cmd) => ec2_cmd.execute(opts).await,
-            AWSSubCommand::LegacyASGCompat(args) => {
-                crate::commands::aws::legacy::normalize_asg(args)
-                    .execute(opts)
-                    .await
-            }
-            AWSSubCommand::SSM(ssm_cmd) => ssm_cmd.execute(opts).await,
-            AWSSubCommand::Console(console_cmd) => console_cmd.execute(opts).await,
-            AWSSubCommand::Logout(logout_cmd) => logout_cmd.execute(opts).await,
-            AWSSubCommand::Login(_) => {
+            AWSHandlerCommand::Elb(elb_cmd) => elb_cmd.execute(opts).await,
+            AWSHandlerCommand::Whoami(whoami_cmd) => whoami_cmd.execute(opts).await,
+            AWSHandlerCommand::Route53(route53_cmd) => route53_cmd.execute(opts).await,
+            AWSHandlerCommand::Ec2(ec2_cmd) => ec2_cmd.execute(opts).await,
+            AWSHandlerCommand::Asg(asg_cmd) => asg_cmd.execute(opts).await,
+            AWSHandlerCommand::SSM(ssm_cmd) => ssm_cmd.execute(opts).await,
+            AWSHandlerCommand::Console(console_cmd) => console_cmd.execute(opts).await,
+            AWSHandlerCommand::Logout(logout_cmd) => logout_cmd.execute(opts).await,
+            AWSHandlerCommand::Login(_) => {
                 unreachable!("SSO command should have been handled earlier")
             }
         }

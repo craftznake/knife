@@ -1,8 +1,8 @@
 use crate::commands::aws::{
+    asg::arg::AWSASGCommand,
     console::arg::AWSConsoleCommand,
     ec2::arg::AWSEC2Command,
     elb::arg::AWSElbCommand,
-    legacy::LegacyASG,
     login::arg::AWSLoginCommand,
     logout::arg::AWSLogoutCommand,
     resource::arg::{
@@ -33,6 +33,8 @@ pub struct AWSCommand {
     pub output_format: OutputFormat,
     #[command(subcommand)]
     pub command: AWSSubCommand,
+    #[arg(skip)]
+    pub handler_command: Option<(AWSHandlerCommand, OutputFormat)>,
 }
 #[derive(Debug, Subcommand)]
 #[command(rename_all = "kebab-case")]
@@ -56,16 +58,8 @@ pub enum AWSSubCommand {
     /// Detach instances from an Auto Scaling group.
     #[command(name = "detach")]
     Detach(DetachResource),
-    #[command(name = "elb", hide = true)]
-    LegacyElb(AWSElbCommand),
     #[command(name = "whoami")]
     Whoami(AWSWhoAmICommand),
-    #[command(name = "route53", hide = true)]
-    LegacyRoute53(AWSRoute53Command),
-    #[command(name = "ec2", hide = true)]
-    EC2Compat(AWSEC2Command),
-    #[command(name = "asg", hide = true)]
-    LegacyASGCompat(LegacyASG),
     #[command(name = "ssm")]
     SSM(AWSSSMCommand),
     #[command(name = "login")]
@@ -74,6 +68,37 @@ pub enum AWSSubCommand {
     Logout(AWSLogoutCommand),
     #[command(name = "console")]
     Console(AWSConsoleCommand),
+}
+#[derive(Debug)]
+pub enum AWSHandlerCommand {
+    Ec2(AWSEC2Command),
+    Elb(AWSElbCommand),
+    Route53(AWSRoute53Command),
+    Asg(AWSASGCommand),
+    Whoami(AWSWhoAmICommand),
+    SSM(AWSSSMCommand),
+    Login(AWSLoginCommand),
+    Logout(AWSLogoutCommand),
+    Console(AWSConsoleCommand),
+}
+impl From<AWSSubCommand> for AWSHandlerCommand {
+    fn from(value: AWSSubCommand) -> Self {
+        match value {
+            AWSSubCommand::Get(_)
+            | AWSSubCommand::Describe(_)
+            | AWSSubCommand::Delete(_)
+            | AWSSubCommand::Scale(_)
+            | AWSSubCommand::Attach(_)
+            | AWSSubCommand::Detach(_) => {
+                unreachable!("resource commands are converted before dispatch")
+            }
+            AWSSubCommand::Whoami(v) => Self::Whoami(v),
+            AWSSubCommand::SSM(v) => Self::SSM(v),
+            AWSSubCommand::Login(v) => Self::Login(v),
+            AWSSubCommand::Logout(v) => Self::Logout(v),
+            AWSSubCommand::Console(v) => Self::Console(v),
+        }
+    }
 }
 #[derive(Debug)]
 pub struct GlobalOptions {

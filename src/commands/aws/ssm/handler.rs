@@ -30,7 +30,7 @@ impl StartArg {
         client: &Client,
         opts: GlobalOptions,
     ) -> Result<Output, Box<dyn std::error::Error>> {
-        let instance_id = self.instance_id();
+        let instance_id = &self.id;
         if instance_id.is_empty() {
             return Err(format!("Error: Invalid instance ARN.").into());
         }

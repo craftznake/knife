@@ -10,13 +10,10 @@ pub struct AWSElbCommand {
 #[derive(Debug, Subcommand)]
 pub enum ElbSubCommand {
     /// Get command - Get load balancer using name
-    #[command(name = "get", hide = true)]
     Get(GetArg),
     /// get-listener - Get load balancer's listener using lb arn
-    #[command(name = "get-listeners", hide = true)]
     GetListeners(GetListenersArg),
     /// get-rules - Get listener's rules using listener_arn
-    #[command(name = "get-rules", hide = true)]
     GetRules(GetRulesArg),
 }
 

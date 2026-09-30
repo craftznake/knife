@@ -7,7 +7,6 @@ pub mod asg;
 pub mod console;
 pub mod ec2;
 pub mod elb;
-pub mod legacy;
 pub mod login;
 pub mod logout;
 pub mod resource;
