@@ -80,6 +80,7 @@ impl SearchArg {
                 output.stdout(&crate::commands::aws::resource::output::render(
                     &serde_json::to_value(&instances)?,
                     opts.output_format,
+                    crate::commands::aws::resource::output::ResourceKind::Ec2,
                 )?);
                 Ok(output)
             }
@@ -317,6 +318,7 @@ async fn describe_instance(
     output.stdout(&crate::commands::aws::resource::output::render(
         &value,
         opts.output_format,
+        crate::commands::aws::resource::output::ResourceKind::Ec2,
     )?);
     Ok(output)
 }

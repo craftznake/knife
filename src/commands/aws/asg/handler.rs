@@ -38,6 +38,7 @@ impl AWSASGCommand {
                 output.stdout(&crate::commands::aws::resource::output::render(
                     &asg,
                     opts.output_format,
+                    crate::commands::aws::resource::output::ResourceKind::Asg,
                 )?);
                 Ok(output)
             }
@@ -58,6 +59,7 @@ pub async fn get_asg(
             output.stdout(&crate::commands::aws::resource::output::render(
                 &asg,
                 opts.output_format,
+                crate::commands::aws::resource::output::ResourceKind::Asg,
             )?);
             Ok(output)
         }

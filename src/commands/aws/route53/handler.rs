@@ -70,6 +70,7 @@ async fn execute(
             output.stdout(&crate::commands::aws::resource::output::render(
                 &result,
                 opts.output_format,
+                crate::commands::aws::resource::output::ResourceKind::Route53,
             )?);
             Ok(output)
         }

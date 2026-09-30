@@ -61,6 +61,7 @@ impl GetArg {
         output.stdout(&crate::commands::aws::resource::output::render(
             &serde_json::to_value(&lb_data)?,
             opts.output_format,
+            crate::commands::aws::resource::output::ResourceKind::Elb,
         )?);
         Ok(output)
     }
@@ -409,6 +410,7 @@ impl GetRulesArg {
         output.stdout(&crate::commands::aws::resource::output::render(
             &serde_json::to_value(&rule_data)?,
             opts.output_format,
+            crate::commands::aws::resource::output::ResourceKind::ElbRules,
         )?);
         Ok(output)
     }
@@ -647,6 +649,7 @@ impl GetListenersArg {
                     output.stdout(&crate::commands::aws::resource::output::render(
                         &serde_json::to_value(&listener_data)?,
                         opts.output_format,
+                        crate::commands::aws::resource::output::ResourceKind::ElbListeners,
                     )?);
                     return Ok(output);
                 }
@@ -712,6 +715,7 @@ impl ListenerExt for Listener {
                     "Order": a.order()
                 }))
                 .collect::<Vec<_>>(),
+            "TargetGroupArn": self.default_actions().iter().find_map(|a| a.target_group_arn()),
             "AlpnPolicy": self.alpn_policy()
         })
     }
@@ -719,7 +723,14 @@ impl ListenerExt for Listener {
         json!({
             "Arn": self.listener_arn().unwrap_or("N/A"),
             "Port": self.port().map(|p| p.to_string()).unwrap_or("N/A".to_string()),
-            "Protocol": self.protocol().map(|p| p.as_str()).unwrap_or("N/A")
+            "Protocol": self.protocol().map(|p| p.as_str()).unwrap_or("N/A"),
+            "TargetGroupArn": self.default_actions().iter().find_map(|a| a.target_group_arn()),
+            "DefaultActions": self.default_actions()
+                .iter()
+                .map(|a| json!({
+                    "TargetGroupArn": a.target_group_arn(),
+                }))
+                .collect::<Vec<_>>()
         })
     }
 }

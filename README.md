@@ -20,17 +20,19 @@ A Rust-based CLI tool which includes my daily development tools/toils.
     ```bash
     export PATH=$PATH:~/.cargo/bin
     ```
-3. Register knife completion:
+3. Register knife completion in your active shell:
    ```bash
-   eval "$(knife completion $(basename $SHELL) 2>/dev/null)"
+   # bash
+   eval "$(COMPLETE=bash knife)"
    ```
-   The registration includes dynamic identifier suggestions. Set `KNIFE_DISABLE_RECENTS=1` to disable the local recents cache and dynamic suggestions. The `eval knife completion ...` instructions above remain supported.
-   or add this below line to your shell configuration
-   ```bash
-   if type knife 1>/dev/null 2>&1; then
-    eval "$(knife completion $(basename $SHELL) 2>/dev/null)"
-   fi
+   ```zsh
+   # Requires compinit (typically enabled in .zshrc).
+   eval "$(COMPLETE=zsh knife)"
    ```
+   ```fish
+   COMPLETE=fish knife | source
+   ```
+   `knife completion <shell>` remains available for static completions, but does not suggest resource identifiers. Dynamic identifier suggestions use the local recents cache; set `KNIFE_DISABLE_RECENTS=1` to opt out.
 3. Enjoy knife :)
     ```bash
     knife echo --debug # this will start echo server
