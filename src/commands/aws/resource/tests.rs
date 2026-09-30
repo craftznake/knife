@@ -95,17 +95,6 @@ fn context_flags_and_output_formats_parse() {
     for argv in [
         vec![
             "knife",
-            "--profile",
-            "dev",
-            "--region",
-            "us-west-2",
-            "aws",
-            "get",
-            "ec2",
-            "i-1",
-        ],
-        vec![
-            "knife",
             "aws",
             "--profile",
             "dev",
@@ -153,13 +142,7 @@ fn required_identifiers_and_filter_requirements_are_enforced() {
     let crate::args::Command::Aws(aws) = parsed.command else {
         panic!("expected AWS")
     };
-    let crate::commands::aws::resource::arg::GetKind::Ec2(args) = (match &aws.command {
-        crate::commands::aws::arg::AWSSubCommand::Get(get) => &get.resource,
-        _ => panic!("expected EC2 get"),
-    }) else {
-        panic!("expected EC2 get")
-    };
-    let Err(error) = crate::commands::aws::ec2::handler::validate_filters(args) else {
+    let Err(error) = crate::commands::aws::resource::handler::validate_ec2_filters(&aws) else {
         panic!("expected incompatible-filter error")
     };
     assert!(error.contains("--state cannot be combined"));
@@ -167,13 +150,7 @@ fn required_identifiers_and_filter_requirements_are_enforced() {
     let crate::args::Command::Aws(aws) = parsed.command else {
         panic!("expected AWS")
     };
-    let crate::commands::aws::resource::arg::GetKind::Ec2(args) = (match &aws.command {
-        crate::commands::aws::arg::AWSSubCommand::Get(get) => &get.resource,
-        _ => panic!("expected EC2 get"),
-    }) else {
-        panic!("expected EC2 get")
-    };
-    let Err(error) = crate::commands::aws::ec2::handler::validate_filters(args) else {
+    let Err(error) = crate::commands::aws::resource::handler::validate_ec2_filters(&aws) else {
         panic!("expected unsupported selector error")
     };
     assert!(error.contains("unsupported EC2 selector key"));
